@@ -1,1 +1,1 @@
-# ArcadeOps.DiscordBot
+# FragHub.DiscordBot
