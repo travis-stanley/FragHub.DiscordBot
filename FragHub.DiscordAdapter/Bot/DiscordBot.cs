@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using FragHub.Application.Abstractions;
 using DiscordConfig = FragHub.DiscordAdapter.Config.DiscordConfig;
 
-namespace FragHub.Discord.Bot;
+namespace FragHub.DiscordAdapter.Bot;
 
 public class DiscordBot(
     ILogger<DiscordBot> _logger,

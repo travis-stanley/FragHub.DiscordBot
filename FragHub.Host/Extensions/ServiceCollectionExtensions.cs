@@ -11,9 +11,9 @@ using System.Reflection;
 using FragHub.Application;
 using FragHub.Application.Abstractions;
 using FragHub.Application.Music.Abstractions;
-using FragHub.Discord.Bot;
-using FragHub.Discord.Music.Players;
-using FragHub.Discord.Music.Tracks;
+using FragHub.DiscordAdapter.Bot;
+using FragHub.DiscordAdapter.Music.Players;
+using FragHub.DiscordAdapter.Music.Tracks;
 using FragHub.DiscordAdapter.Config;
 using FragHub.Infrastructure.Env;
 using DiscordConfig = FragHub.DiscordAdapter.Config.DiscordConfig;
@@ -157,15 +157,21 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddDiscordServices(this IServiceCollection services)
     {
         services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig() { GatewayIntents = GatewayIntents.All }));
-        services.AddSingleton<InteractionServiceConfig>(_ => new()
+        services.AddSingleton(new InteractionServiceConfig
         {
             DefaultRunMode = RunMode.Async,
             LogLevel = LogSeverity.Info,
             UseCompiledLambda = true
+        });        
+
+        services.AddSingleton(sp =>
+        {
+            var client = sp.GetRequiredService<DiscordSocketClient>();
+            var config = sp.GetRequiredService<InteractionServiceConfig>();
+            return new InteractionService(client, config);
         });
 
-        services.AddSingleton<InteractionService>();
-        services.AddSingleton<InteractionHandler>();
+        services.AddSingleton<InteractionHandler>();        
 
         return services;
     }
@@ -183,21 +189,6 @@ public static class ServiceCollectionExtensions
         services.AddGenericHandlers(typeof(ICommand).Assembly, typeof(ICommandHandler<>), ServiceLifetime.Transient);
         services.AddSingleton<CommandDispatcher>();
 
-        return services;
-    }
-
-    /// <summary>
-    /// Adds a hosted Discord bot service to the specified <see cref="IServiceCollection"/>.
-    /// </summary>
-    /// <remarks>This method registers the <see cref="DiscordBot"/> as a hosted service, enabling it to run  
-    /// as part of the application's background services. The bot will be managed by the application's   hosting
-    /// infrastructure.</remarks>
-    /// <param name="services">The <see cref="IServiceCollection"/> to which the hosted Discord bot service is added.</param>
-    /// <returns>The updated <see cref="IServiceCollection"/> instance.</returns>
-    public static IServiceCollection AddHostedDiscordBot(this IServiceCollection services)
-    {
-        services.AddHostedService<DiscordBot>();
-        
         return services;
     }
 

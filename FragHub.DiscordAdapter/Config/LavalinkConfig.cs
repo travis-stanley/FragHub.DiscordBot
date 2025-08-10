@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 
 namespace FragHub.DiscordAdapter.Config;
 
+/// <summary>
+/// Environmental variable names used to retrieve configuration settings for the lavalink server.
+/// Do not set these variables to actual values. Set them in the .env file.
+/// </summary>
 public class LavalinkConfig
 {
     public const string Host = "LAVALINK_HOST";

@@ -7,6 +7,6 @@ using System.Threading.Tasks;
 using Discord;
 using Lavalink4NET.Players.Queued;
 
-namespace FragHub.Discord.Music.Players;
+namespace FragHub.DiscordAdapter.Music.Players;
 
 public sealed record class CustomPlayerOptions() : QueuedLavalinkPlayerOptions; //ITextChannel? TextChannel -- needed?

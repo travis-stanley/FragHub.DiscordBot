@@ -1,9 +1,10 @@
 ﻿// Host/Program.cs
+using DotNetEnv;
+using FragHub.DiscordAdapter.Bot;
+using FragHub.Host.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using FragHub.Host.Extensions;
-using DotNetEnv;
 
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -21,6 +22,7 @@ builder.Services.AddLavalinkServices();
 builder.Services.AddMusicServices();
 
 builder.Services.AddDiscordServices();
-builder.Services.AddHostedDiscordBot();
+
+builder.Services.AddHostedService<DiscordBot>();    // main service
 
 builder.Build().Run();

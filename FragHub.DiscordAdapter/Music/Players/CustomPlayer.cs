@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using FragHub.Application.Music.Abstractions;
 using FragHub.Domain.Music.Entities;
 
-namespace FragHub.Discord.Music.Players;
+namespace FragHub.DiscordAdapter.Music.Players;
 
 public class CustomPlayer(IPlayerProperties<CustomPlayer, CustomPlayerOptions> properties) : QueuedLavalinkPlayer(properties), IInactivityPlayerListener, IMusicPlayer
 {

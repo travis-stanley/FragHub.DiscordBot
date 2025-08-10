@@ -6,7 +6,7 @@ using FragHub.Application.Abstractions;
 using FragHub.Application.Music.Commands;
 using FragHub.Domain.Env;
 
-namespace FragHub.Discord.Music.Modules;
+namespace FragHub.DiscordAdapter.Music.Modules;
 
 public class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _commandDispatcher, IVariableService _variableService) : InteractionModuleBase<SocketInteractionContext>
 {

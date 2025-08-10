@@ -3,7 +3,7 @@ using Lavalink4NET.Rest.Entities.Tracks;
 using FragHub.Application.Music.Abstractions;
 using FragHub.Domain.Music.Entities;
 
-namespace FragHub.Discord.Music.Tracks;
+namespace FragHub.DiscordAdapter.Music.Tracks;
 
 public class TrackService(IAudioService _audioService) : ITrackService
 {

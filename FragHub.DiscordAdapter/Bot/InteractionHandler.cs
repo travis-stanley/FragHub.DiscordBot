@@ -1,11 +1,13 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using FragHub.Application.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
 using IResult = Discord.Interactions.IResult;
+using DiscordConfig = FragHub.DiscordAdapter.Config.DiscordConfig;
 
-namespace FragHub.Discord.Bot;
+namespace FragHub.DiscordAdapter.Bot;
 
 
 /// <summary>
@@ -20,7 +22,7 @@ namespace FragHub.Discord.Bot;
 /// <param name="_client"></param>
 /// <param name="_handler"></param>
 /// <param name="_services"></param>
-public class InteractionHandler(ILogger<InteractionHandler> _logger, DiscordSocketClient _client, InteractionService _handler, IServiceProvider _services)
+public class InteractionHandler(ILogger<InteractionHandler> _logger, DiscordSocketClient _client, InteractionService _handler, IServiceProvider _services, IVariableService _variableService)
 {
 
     /// <summary>
@@ -82,7 +84,16 @@ public class InteractionHandler(ILogger<InteractionHandler> _logger, DiscordSock
     private async Task ReadyAsync()
     {
         _logger.LogInformation("Ready event triggered. Registering commands...");
-        await _handler.RegisterCommandsGloballyAsync().ConfigureAwait(false);
+
+        var devGuildId = _variableService.GetVariable(DiscordConfig.DevelopmentGuildId);
+        if (!string.IsNullOrWhiteSpace(devGuildId))
+        {
+            _logger.LogInformation("Registering commands to guild with ID: {GuildId}", devGuildId);
+            await _handler.RegisterCommandsToGuildAsync(ulong.Parse(devGuildId)).ConfigureAwait(false);
+        }
+
+        await _handler.RegisterCommandsGloballyAsync().ConfigureAwait(false);   // takes long to propagate        
+
         _logger.LogInformation("Commands registered globally.");
     }
 

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 using FragHub.Application.Music.Abstractions;
 
-namespace FragHub.Discord.Music.Players;
+namespace FragHub.DiscordAdapter.Music.Players;
 
 public class PlayerService(IAudioService _audioService) : IPlayerService
 {
