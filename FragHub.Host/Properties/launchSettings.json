@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Tony.Host": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
