@@ -8,7 +8,8 @@ using FragHub.Domain.Env;
 
 namespace FragHub.DiscordAdapter.Music.Modules;
 
-public class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _commandDispatcher, IVariableService _variableService) : InteractionModuleBase<SocketInteractionContext>
+[RequireContext(ContextType.Guild)]
+public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _commandDispatcher, IVariableService _variableService) : InteractionModuleBase<SocketInteractionContext>
 {
 
     [SlashCommand("play", description: "Play or add a song to the queue", runMode: RunMode.Async)]

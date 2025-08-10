@@ -42,7 +42,7 @@ public class InteractionHandler(ILogger<InteractionHandler> _logger, DiscordSock
         _handler.Log += Log;
 
         // Add the public modules that inherit InteractionModuleBase<T> to the InteractionService
-        await _handler.AddModulesAsync(Assembly.GetEntryAssembly(), _services).ConfigureAwait(false);
+        await LoadModules();
 
         // Process the InteractionCreated payloads to execute Interactions commands
         _client.InteractionCreated += HandleInteraction;
@@ -51,6 +51,30 @@ public class InteractionHandler(ILogger<InteractionHandler> _logger, DiscordSock
         _handler.InteractionExecuted += HandleInteractionExecuted;
 
         _logger.LogInformation("InteractionHandler initialized and ready to process interactions.");
+    }
+
+    private async Task LoadModules()
+    {
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location)).ToArray();
+        
+        var modules = new List<ModuleInfo>();
+        foreach (var assembly in assemblies)
+        {
+            _logger.LogInformation("Check for modules in assembly: {AssemblyName}", assembly.GetName().Name);
+            modules.AddRange(await _handler.AddModulesAsync(assembly, _services).ConfigureAwait(false));
+        }        
+        foreach (var module in modules)
+        {
+            Console.WriteLine($"Module: {module.Name} ({module.SlashCommands.Count} commands)");
+            foreach (var cmd in module.SlashCommands)
+            {
+                Console.WriteLine($"  Command: {cmd.Name}");
+            }
+        }
+        if (modules.Count == 0)
+        {
+            _logger.LogWarning("No modules were found to register. Ensure that your modules inherit from InteractionModuleBase<T>.");
+        }
     }
 
     /// <summary>
