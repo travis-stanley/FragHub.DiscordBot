@@ -11,9 +11,7 @@ namespace FragHub.DiscordAdapter.Bot;
 public class DiscordBot(
     ILogger<DiscordBot> _logger,
     DiscordSocketClient _discordSocketClient, 
-    InteractionService _interactionService, 
     InteractionHandler _interactionHandler, 
-    IServiceProvider _serviceProvider, 
     IVariableService _variableService
     ) : IHostedService
 {
@@ -33,8 +31,6 @@ public class DiscordBot(
         // Initialize the interaction handler to register commands and set up event handlers
         await _interactionHandler.InitializeAsync().ConfigureAwait(false); 
 
-        _discordSocketClient.InteractionCreated += InteractionCreated;
-
         await _discordSocketClient.LoginAsync(TokenType.Bot, _variableService.GetVariable(DiscordConfig.BotToken)).ConfigureAwait(false);
         await _discordSocketClient.StartAsync().ConfigureAwait(false);
     }
@@ -52,23 +48,7 @@ public class DiscordBot(
     {
         await _interactionHandler.Dispose().ConfigureAwait(false);
 
-        _discordSocketClient.InteractionCreated -= InteractionCreated;
-
         await _discordSocketClient.StopAsync().ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Handles the creation of a new interaction and executes the associated command.
-    /// </summary>
-    /// <remarks>This method processes the provided <paramref name="interaction"/> by creating a context and
-    /// passing it to the interaction service. Ensure that the interaction service and service provider are properly
-    /// configured before invoking this method.</remarks>
-    /// <param name="interaction">The interaction received from the Discord gateway.</param>
-    /// <returns>A task representing the asynchronous operation. The result contains the outcome of the command execution.</returns>
-    private Task<IResult> InteractionCreated(SocketInteraction interaction)
-    {
-        var interactionContext = new SocketInteractionContext(_discordSocketClient, interaction);
-        return _interactionService!.ExecuteCommandAsync(interactionContext, _serviceProvider);
     }
 
 }
