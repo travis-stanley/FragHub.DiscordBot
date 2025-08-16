@@ -13,7 +13,6 @@ using FragHub.Application.Abstractions;
 using FragHub.Application.Music.Abstractions;
 using FragHub.DiscordAdapter.Bot;
 using FragHub.DiscordAdapter.Music.Players;
-using FragHub.DiscordAdapter.Music.Tracks;
 using FragHub.DiscordAdapter.Config;
 using FragHub.Infrastructure.Env;
 using DiscordConfig = FragHub.DiscordAdapter.Config.DiscordConfig;
@@ -139,8 +138,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The <see cref="IServiceCollection"/> instance with the music services registered.</returns>
     public static IServiceCollection AddMusicServices(this IServiceCollection services)
     {
-        services.AddSingleton<IPlayerService, PlayerService>();
-        services.AddSingleton<ITrackService, TrackService>();
+        services.AddSingleton<IPlayerService, PlayerService>();        
 
         return services;
     }
@@ -160,7 +158,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(new InteractionServiceConfig
         {
             DefaultRunMode = RunMode.Async,
-            LogLevel = LogSeverity.Info,
+            LogLevel = LogSeverity.Debug,
             UseCompiledLambda = true
         });        
 

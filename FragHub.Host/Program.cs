@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// Load environment variables from .env file(s) -- see .env
 Env.Load();
 Env.TraversePath().Load();
 

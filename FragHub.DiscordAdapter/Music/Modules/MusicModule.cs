@@ -5,19 +5,21 @@ using FragHub.Application;
 using FragHub.Application.Abstractions;
 using FragHub.Application.Music.Commands;
 using FragHub.Domain.Env;
+using FragHub.Application.Music.Abstractions;
 
 namespace FragHub.DiscordAdapter.Music.Modules;
 
-public class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _commandDispatcher, IVariableService _variableService) : InteractionModuleBase<SocketInteractionContext>
+[RequireContext(ContextType.Guild)]
+public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _commandDispatcher, IVariableService _variableService, IPlayerService _playerService) : InteractionModuleBase<SocketInteractionContext>
 {
 
-    [SlashCommand("play", description: "Play or add a song to the queue", runMode: RunMode.Async)]
+    [SlashCommand("play", description: "Play or add a song to the queue")]  // , runMode: RunMode.Async
     public async Task Play(string song_artist_url_etc)
-    {
-        _logger.LogInformation("Received play command: from {User} - {Input}", Context.User.Username, song_artist_url_etc);
-
+    {        
         // follow up calls are tied to first, thus follow ephemeral of first
-        await DeferAsync(ephemeral: true).ConfigureAwait(false);
+        await DeferAsync(ephemeral: true);
+
+        _logger.LogInformation("Received play command: from {User} - {Input}", Context.User.Username, song_artist_url_etc);
 
         // validate input
         if (string.IsNullOrWhiteSpace(song_artist_url_etc))
@@ -58,7 +60,22 @@ public class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _comman
         };
         await _commandDispatcher.DispatchAsync(playCommand).ConfigureAwait(false);
 
-        await FollowupAsync($"Request to play {song_artist_url_etc} submitted").ConfigureAwait(false);
+        var track = _playerService.Tracks.LastOrDefault();
+        if (track is null || track.Uri is null)
+        {
+            await FollowupAsync($"No track found for query: {song_artist_url_etc}").ConfigureAwait(false);
+            return;
+        }
+
+        await FollowupAsync($"Adding {track.Title} by {track.Author} to the play list").ConfigureAwait(false);
+    }
+
+
+
+
+    private async Task RebuildPlayer()
+    {
+        var tracks = _playerService.Tracks;
     }
 
 }

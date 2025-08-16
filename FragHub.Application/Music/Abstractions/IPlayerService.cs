@@ -10,5 +10,7 @@ namespace FragHub.Application.Music.Abstractions;
 
 public interface IPlayerService
 {
-    Task<IMusicPlayer?> GetPlayerAsync(ulong guildId, ulong voiceChannelId, ulong userId, bool connectToVoiceChannel = true);
+    IEnumerable<Track> Tracks { get; }
+
+    Task PlayAsync(PlayTrackCommand command);
 }
