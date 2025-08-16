@@ -33,12 +33,65 @@ public class MusicService(IAudioService _audioService) : IMusicService
         var track = await GetTrackAsync(command.Query).ConfigureAwait(false) ?? throw new InvalidOperationException($"Track not found for query: {command.Query}");
         var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
         _tracks.Add(track);
-
+        
         await player.PlayAsync(command, track).ConfigureAwait(false);
     }
 
 
+    public async Task StopAsync(StopTrackCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command, nameof(command));
+        if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
+        if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
 
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
+        
+        await player.StopAsync(command).ConfigureAwait(false);
+    }
+
+    public async Task SkipAsync(SkipTrackCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command, nameof(command));
+        if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
+        if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
+
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
+
+        await player.SkipAsync(command).ConfigureAwait(false);
+    }
+
+    public async Task PauseAsync(PauseTrackCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command, nameof(command));
+        if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
+        if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
+
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
+
+        await player.PauseAsync(command).ConfigureAwait(false);
+    }
+
+    public async Task ResumeAsync(ResumeTrackCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command, nameof(command));
+        if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
+        if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
+
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
+
+        await player.ResumeAsync(command).ConfigureAwait(false);
+    }
+
+    public async Task SetShuffleAsync(ShuffleTracksCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command, nameof(command));
+        if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
+        if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
+
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
+
+        player.SetShuffle(command, command.Enabled);
+    }
 
 
     /// <summary>

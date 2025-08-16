@@ -7,6 +7,10 @@ using FragHub.Application.Abstractions;
 
 namespace FragHub.Application.Music.Commands
 {
+
+    /// <summary>
+    /// Command base class for music-related commands.
+    /// </summary>
     public class Command : ICommand
     {
         public ulong GuildId { get; set; }

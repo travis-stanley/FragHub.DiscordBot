@@ -58,13 +58,6 @@ public class MusicPlayer(IPlayerProperties<MusicPlayer, MusicPlayerOptions> prop
         return await PlayAsync(track.Uri).ConfigureAwait(false);
     }
 
-    public async Task SkipAsync(ICommand command)
-    {
-        _commands.Add(command ?? throw new ArgumentNullException(nameof(command), "Command cannot be null."));
-
-        await SkipAsync().ConfigureAwait(false);
-    }
-
     public async Task StopAsync(ICommand command)
     {
         _commands.Add(command ?? throw new ArgumentNullException(nameof(command), "Command cannot be null."));
@@ -72,11 +65,32 @@ public class MusicPlayer(IPlayerProperties<MusicPlayer, MusicPlayerOptions> prop
         await StopAsync().ConfigureAwait(false);
     }
 
-    public void ToggleShuffle(ICommand command)
+    public async Task SkipAsync(ICommand command)
     {
         _commands.Add(command ?? throw new ArgumentNullException(nameof(command), "Command cannot be null."));
 
-        this.Shuffle = !this.Shuffle;
+        await SkipAsync().ConfigureAwait(false);
+    }
+
+    public async Task PauseAsync(ICommand command)
+    {
+        _commands.Add(command ?? throw new ArgumentNullException(nameof(command), "Command cannot be null."));
+        
+        await PauseAsync().ConfigureAwait(false);
+    }
+
+    public async Task ResumeAsync(ICommand command)
+    {
+        _commands.Add(command ?? throw new ArgumentNullException(nameof(command), "Command cannot be null."));
+
+        await ResumeAsync().ConfigureAwait(false);
+    }
+
+    public void SetShuffle(ICommand command, bool enabled)
+    {
+        _commands.Add(command ?? throw new ArgumentNullException(nameof(command), "Command cannot be null."));
+
+        this.Shuffle = enabled;
     }
 
     #endregion

@@ -13,4 +13,9 @@ public interface IMusicService
     IEnumerable<Track> Tracks { get; }
 
     Task PlayAsync(PlayTrackCommand command);
+    Task StopAsync(StopTrackCommand command);
+    Task SkipAsync(SkipTrackCommand command);
+    Task PauseAsync(PauseTrackCommand command);
+    Task ResumeAsync(ResumeTrackCommand command);
+    Task SetShuffleAsync(ShuffleTracksCommand command);
 }

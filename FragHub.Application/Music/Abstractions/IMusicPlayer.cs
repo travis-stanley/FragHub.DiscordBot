@@ -10,10 +10,12 @@ namespace FragHub.Application.Music.Abstractions;
 
 public interface IMusicPlayer
 {
-    Task<int> PlayAsync(ICommand command, Track track);
-    Task SkipAsync(ICommand command);
+    Task<int> PlayAsync(ICommand command, Track track);    
     Task StopAsync(ICommand command);
-    void ToggleShuffle(ICommand command);
+    Task SkipAsync(ICommand command);
+    Task PauseAsync(ICommand command);
+    Task ResumeAsync(ICommand command);    
+    void SetShuffle(ICommand command, bool enabled);
 
     IEnumerable<ICommand> GetCommands();
 }
