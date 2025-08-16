@@ -9,11 +9,11 @@ using FragHub.Domain.Music.Entities;
 
 namespace FragHub.Application.Music.Commands;
 
-public class PlayTrackCommandHandler(IPlayerService _playerService) : ICommandHandler<PlayTrackCommand>
+public class PlayTrackCommandHandler(IMusicService _musicService) : ICommandHandler<PlayTrackCommand>
 {
     public async Task HandleAsync(PlayTrackCommand command)
     {
         ArgumentNullException.ThrowIfNull(command, nameof(command));
-        await _playerService.PlayAsync(command).ConfigureAwait(false);
+        await _musicService.PlayAsync(command).ConfigureAwait(false);
     }
 }

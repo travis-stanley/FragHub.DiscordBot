@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace FragHub.DiscordAdapter.Music.Players;
 
-public class PlayerService(IAudioService _audioService) : IPlayerService
+public class MusicService(IAudioService _audioService) : IMusicService
 {
     /// <summary>
     /// Gets the list of tracks sent to the player.
@@ -54,9 +54,9 @@ public class PlayerService(IAudioService _audioService) : IPlayerService
     {
         var retrieveOptions = new PlayerRetrieveOptions(ChannelBehavior: connectToVoiceChannel ? PlayerChannelBehavior.Join : PlayerChannelBehavior.None);
 
-        var customPlayerOptions = new CustomPlayerOptions();
+        var customPlayerOptions = new MusicPlayerOptions();
 
-        var result = await _audioService.Players.RetrieveAsync<CustomPlayer, CustomPlayerOptions>(guildId, voiceChannelId, playerFactory: CreatePlayer, options: Options.Create(customPlayerOptions), retrieveOptions: retrieveOptions).ConfigureAwait(false);
+        var result = await _audioService.Players.RetrieveAsync<MusicPlayer, MusicPlayerOptions>(guildId, voiceChannelId, playerFactory: CreatePlayer, options: Options.Create(customPlayerOptions), retrieveOptions: retrieveOptions).ConfigureAwait(false);
         if (!result.IsSuccess)
             throw new InvalidOperationException($"Failed to retrieve player: {result.Status}");
 
@@ -66,10 +66,10 @@ public class PlayerService(IAudioService _audioService) : IPlayerService
         return result.Player;
     }
 
-    private static ValueTask<CustomPlayer> CreatePlayer(IPlayerProperties<CustomPlayer, CustomPlayerOptions> properties, CancellationToken cancellationToken)
+    private static ValueTask<MusicPlayer> CreatePlayer(IPlayerProperties<MusicPlayer, MusicPlayerOptions> properties, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(new CustomPlayer(properties));
+        return ValueTask.FromResult(new MusicPlayer(properties));
     }
 
     private async Task<Track?> GetTrackAsync(string query, CancellationToken cancellationToken = default)

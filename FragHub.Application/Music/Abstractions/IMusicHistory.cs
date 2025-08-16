@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,9 +9,7 @@ using FragHub.Domain.Music.Entities;
 
 namespace FragHub.Application.Music.Abstractions;
 
-public interface IPlayerService
+public interface IMusicHistory
 {
     IEnumerable<Track> Tracks { get; }
-
-    Task PlayAsync(PlayTrackCommand command);
 }

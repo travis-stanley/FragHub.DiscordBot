@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace FragHub.DiscordAdapter.Music.Players;
 
-public class CustomPlayer(IPlayerProperties<CustomPlayer, CustomPlayerOptions> properties) : QueuedLavalinkPlayer(properties), IInactivityPlayerListener, IMusicPlayer
+public class MusicPlayer(IPlayerProperties<MusicPlayer, MusicPlayerOptions> properties) : QueuedLavalinkPlayer(properties), IInactivityPlayerListener, IMusicPlayer
 {
     /// <summary>
     /// Command history for this player.

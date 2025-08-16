@@ -9,4 +9,4 @@ using Lavalink4NET.Players.Queued;
 
 namespace FragHub.DiscordAdapter.Music.Players;
 
-public sealed record class CustomPlayerOptions() : QueuedLavalinkPlayerOptions; //ITextChannel? TextChannel -- needed?
+public sealed record class MusicPlayerOptions() : QueuedLavalinkPlayerOptions;

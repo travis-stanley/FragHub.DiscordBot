@@ -10,7 +10,8 @@ using FragHub.Application.Music.Abstractions;
 namespace FragHub.DiscordAdapter.Music.Modules;
 
 [RequireContext(ContextType.Guild)]
-public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _commandDispatcher, IVariableService _variableService, IPlayerService _playerService) : InteractionModuleBase<SocketInteractionContext>
+[Group("Music", "Music commands for playing and managing tracks")]
+public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _commandDispatcher, IVariableService _variableService, IMusicService _musicService) : InteractionModuleBase<SocketInteractionContext>
 {
 
     [SlashCommand("play", description: "Play or add a song to the queue")]  // , runMode: RunMode.Async
@@ -60,7 +61,7 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
         };
         await _commandDispatcher.DispatchAsync(playCommand).ConfigureAwait(false);
 
-        var track = _playerService.Tracks.LastOrDefault();
+        var track = _musicService.Tracks.LastOrDefault();
         if (track is null || track.Uri is null)
         {
             await FollowupAsync($"No track found for query: {song_artist_url_etc}").ConfigureAwait(false);
@@ -75,7 +76,7 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
 
     private async Task RebuildPlayer()
     {
-        var tracks = _playerService.Tracks;
+        var tracks = _musicService.Tracks;
     }
 
 }
