@@ -1,11 +1,16 @@
 ﻿// Host/Program.cs
 using DotNetEnv;
 using FragHub.DiscordAdapter.Bot;
+using FragHub.Domain.Users.Entities;
+using FragHub.Host;
 using FragHub.Host.Extensions;
+using FragHub.Infrastructure.Data;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+var useInMemoryDb = false;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -21,9 +26,21 @@ builder.Services.AddCommandServices();
 builder.Services.AddLavalinkServices();
 
 builder.Services.AddMusicServices();
+builder.Services.AddUserServices();
 
 builder.Services.AddDiscordServices();
 
+builder.Services.AddDataRepositories();
+
+if (useInMemoryDb)
+    builder.Services.AddInMemoryServerContext();
+else
+    builder.Services.AddSqlServerContext();
+
 builder.Services.AddHostedService<DiscordBot>();    // main service
 
-builder.Build().Run();
+var app = builder.Build();
+
+if (useInMemoryDb) { InMemoryDatabase.Seed(app); } // seed in-memory database with default data
+
+app.Run();
