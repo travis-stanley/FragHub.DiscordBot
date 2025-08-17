@@ -1,12 +1,13 @@
 ﻿using FragHub.Application.Music.Abstractions;
 using FragHub.Application.Music.Commands;
+using FragHub.DiscordAdapter.Music.Players;
 using FragHub.Domain.Music.Entities;
 using Lavalink4NET;
 using Lavalink4NET.Players;
 using Lavalink4NET.Rest.Entities.Tracks;
 using Microsoft.Extensions.Options;
 
-namespace FragHub.DiscordAdapter.Music.Players;
+namespace FragHub.DiscordAdapter.Music.Services;
 
 public class MusicService(IAudioService _audioService) : IMusicService
 {

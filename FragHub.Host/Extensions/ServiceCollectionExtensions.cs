@@ -1,22 +1,29 @@
 ﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using FragHub.Application;
+using FragHub.Application.Abstractions;
+using FragHub.Application.Music.Abstractions;
+using FragHub.Application.Repositories.Abstractions;
+using FragHub.Application.Users.Abstractions;
+using FragHub.DiscordAdapter.Bot;
+using FragHub.DiscordAdapter.Config;
+using FragHub.DiscordAdapter.Music.Services;
+using FragHub.DiscordAdapter.Users.Services;
+using FragHub.Infrastructure.Config;
+using FragHub.Infrastructure.Data;
+using FragHub.Infrastructure.Env;
+using FragHub.Infrastructure.Repositories;
 using Lavalink4NET.Extensions;
 using Lavalink4NET.InactivityTracking;
 using Lavalink4NET.InactivityTracking.Extensions;
 using Lavalink4NET.InactivityTracking.Trackers.Idle;
 using Lavalink4NET.InactivityTracking.Trackers.Users;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Reflection;
-using FragHub.Application;
-using FragHub.Application.Abstractions;
-using FragHub.Application.Music.Abstractions;
-using FragHub.DiscordAdapter.Bot;
-using FragHub.DiscordAdapter.Music.Players;
-using FragHub.DiscordAdapter.Config;
-using FragHub.Infrastructure.Env;
-using DiscordConfig = FragHub.DiscordAdapter.Config.DiscordConfig;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
+using DiscordConfig = FragHub.DiscordAdapter.Config.DiscordConfig;
 
 namespace FragHub.Host.Extensions;
 
@@ -76,7 +83,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The updated <see cref="IServiceCollection"/> instance.</returns>
     public static IServiceCollection AddVariableService(this IServiceCollection services)
     {
-        object[] vars = [new LavalinkConfig(), new DiscordConfig()];
+        object[] vars = [new LavalinkConfig(), new DiscordConfig(), new InfrastructureConfig()];
         services.AddSingleton<IVariableService>(sp => new VariableService(sp.GetRequiredService<ILogger<IVariableService>>(), vars));
 
         return services;
@@ -144,6 +151,18 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Add user-related services to the specified <see cref="IServiceCollection"/>.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
+    public static IServiceCollection AddUserServices(this IServiceCollection services)
+    {
+        services.AddSingleton<IUserService, UserService>();
+
+        return services;
+    }
+
+    /// <summary>
     /// Adds Discord-related services to the specified <see cref="IServiceCollection"/>.
     /// </summary>
     /// <remarks>This method registers the <see cref="DiscordSocketClient"/> and <see
@@ -170,6 +189,48 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddSingleton<InteractionHandler>();        
+
+        return services;
+    }
+
+    /// <summary>
+    /// Add the sql server database context to the specified <see cref="IServiceCollection"/>.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <param name="sqlConnectionString"></param>
+    /// <returns></returns>
+    public static IServiceCollection AddSqlServerContext(this IServiceCollection services)
+    {
+        var variableService = services.BuildServiceProvider().GetRequiredService<IVariableService>();
+        var sqlConnectionString = variableService.GetVariable("SQL_CONNECTION_STRING") ?? throw new InvalidOperationException("SQL_CONNECTION_STRING variable is not set.");
+
+        services.AddDbContext<AppDbContext>(options => options.UseSqlServer(sqlConnectionString));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Add a in-memory database context to the specified <see cref="IServiceCollection"/>.
+    /// Used for testing purposes only.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    public static IServiceCollection AddInMemoryServerContext(this IServiceCollection services)
+    {        
+        services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("FragHubDebug"));        
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds data repositories to the specified <see cref="IServiceCollection"/>.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
+    public static IServiceCollection AddDataRepositories(this IServiceCollection services)
+    {
+        services.AddScoped<IUserPlatformRepository, UserPlatformRepository>();
 
         return services;
     }
