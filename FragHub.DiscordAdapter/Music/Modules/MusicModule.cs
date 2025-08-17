@@ -92,6 +92,8 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
             return;
         }
 
+        await RebuildPlayer();
+
         await FollowupAsync($"Adding {track.Title} by {track.Author} to the play list").ConfigureAwait(false);
     }
 
@@ -113,6 +115,8 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
 
         var cmd = GetCommand<StopTrackCommand>(Context, voiceState);
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
+
+        await RebuildPlayer();
 
         await FollowupAsync($"Track stopped").ConfigureAwait(false);
     }
@@ -136,6 +140,8 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
         var cmd = GetCommand<SkipTrackCommand>(Context, voiceState);
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
 
+        await RebuildPlayer();
+
         await FollowupAsync($"Track skipped").ConfigureAwait(false);
     }
 
@@ -157,6 +163,8 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
 
         var cmd = GetCommand<PauseTrackCommand>(Context, voiceState);
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
+
+        await RebuildPlayer();
 
         await FollowupAsync($"Track paused").ConfigureAwait(false);
     }
@@ -180,6 +188,8 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
         var cmd = GetCommand<ResumeTrackCommand>(Context, voiceState);
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
 
+        await RebuildPlayer();
+
         await FollowupAsync($"Track resuming").ConfigureAwait(false);
     }
 
@@ -202,6 +212,8 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
         var cmd = GetCommand<ShuffleTracksCommand>(Context, voiceState);
         cmd.Enabled = shuffle == OnOffCL.On;
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
+
+        await RebuildPlayer();
 
         var state = cmd.Enabled ? "enabled" : "disabled";
         await FollowupAsync($"Shuffed {state}").ConfigureAwait(false);
@@ -228,8 +240,74 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
     #endregion
 
 
+    #region Music Player Controller
+
     private async Task RebuildPlayer()
     {
-        var tracks = _musicService.Tracks;
+        var tracks = _musicService.Tracks.LastOrDefault();
+        if (tracks is null || tracks.Uri is null)
+        {
+            _logger.LogWarning("No tracks available to rebuild player.");
+            return;
+        }
+        _logger.LogInformation("Rebuilding player with track: {TrackTitle} by {TrackAuthor}", tracks.Title, tracks.Author);
+
+        var lastTrack = _musicService.Tracks.LastOrDefault();
+        if (lastTrack is null) { BreakdownPlayer(); return; }
+
+        //var title = $":musical_note:  Music Playing  :musical_note:  in <#{_musicService.}>";
+        //var currentArt = lastTrack.ArtworkUri is not null ? lastTrack.ArtworkUri.ToString() : "";
+        //var currentTrack = lastTrack.Title;
+        //var duration = lastTrack.Duration.ToString(@"hh\:mm\:ss");
+        //var embedUrl = lastTrack.Uri?.ToString();
+        //var thumbnailUrl = "https://media.tenor.com/vqpt7EB_tooAAAAi/music-clu.gif";
+
+        //var customTrack = GetTrack(lastTrack.Identifier);
+        //var requestedBy = customTrack?.GetRequestedByMention();
+
+        //var embedfieldbuilds = new List<EmbedFieldBuilder>
+        //{
+        //    new()
+        //    {
+        //        Name = "Now Playing",
+        //        Value = $"{currentTrack}",
+        //        IsInline = false
+        //    },
+        //    new()
+        //    {
+        //        Name = "Artists",
+        //        Value = customTrack?.GetArtistNames(),
+        //        IsInline = false
+        //    },
+        //    new()
+        //    {
+        //        Name = "Duration",
+        //        Value = duration,
+        //        IsInline = true
+        //    },
+        //    new()
+        //    {
+        //        Name = "Added By",
+        //        Value = requestedBy,
+        //        IsInline = true
+        //    },
+        //    new()
+        //    {
+        //        Name = "Link",
+        //        Value = $"[SourceUrl]({embedUrl})",
+        //        IsInline = true
+        //    }
+        //};
+
+        //var embed = new EmbedBuilder().WithColor(15835392).WithTitle(title).WithFields(embedfieldbuilds).WithThumbnailUrl(thumbnailUrl).WithImageUrl(currentArt).WithTimestamp(DateTimeOffset.Now).Build();
     }
+
+    private void BreakdownPlayer()
+    {
+        _logger.LogInformation("Breaking down player, clearing tracks and stopping playback.");
+        // Clear the current track and stop playback
+        // todo
+    }
+
+    #endregion
 }

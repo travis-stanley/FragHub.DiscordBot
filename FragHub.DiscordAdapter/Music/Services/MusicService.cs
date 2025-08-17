@@ -34,7 +34,7 @@ public class MusicService(IAudioService _audioService) : IMusicService
         var track = await GetTrackAsync(command.Query).ConfigureAwait(false) ?? throw new InvalidOperationException($"Track not found for query: {command.Query}");
         var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
         _tracks.Add(track);
-        
+
         await player.PlayAsync(command, track).ConfigureAwait(false);
     }
 

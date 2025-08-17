@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FragHub.Application.Abstractions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FragHub.Infrastructure.Config
 {
-    public class InfrastructureConfig
+    public class InfrastructureConfig : IEnvConfig
     {
         public const string SqlConnectionString = "SQL_CONNECTION_STRING";
     }
