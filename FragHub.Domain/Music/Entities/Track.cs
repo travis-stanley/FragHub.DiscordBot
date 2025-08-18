@@ -6,6 +6,12 @@ using System.Threading.Tasks;
 
 namespace FragHub.Domain.Music.Entities;
 
+public enum SourceType
+{
+    UserProvided = 0, // Track provided by the user
+    RecommendedByLastfm = 1, // Track recommended by the Last.fm service
+}
+
 public class Track
 {
     public Guid Id { get; } = Guid.NewGuid();
@@ -21,4 +27,15 @@ public class Track
     public Uri? ArtworkUri { get; init; }
 
     public string? SourceName { get; init; }
+    
+
+    public ulong GuildId { get; init; }
+    public ulong VoiceChannelId { get; init; }
+    public ulong? RequestedUserId { get; init; }    // may be null if the track was not requested by a user (e.g., recommended track)
+    public SourceType SourceType { get; init; }
+
+    public bool WasSkipped { get; set; }
+    public bool WasPlayed { get; set; }
+
+    public DateTime DateRequested { get; init; } = DateTime.UtcNow;
 }

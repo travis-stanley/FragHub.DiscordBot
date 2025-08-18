@@ -12,7 +12,11 @@ namespace FragHub.Application.Music.Commands;
 /// <summary>
 /// Play a track based on a query string.
 /// </summary>
-public class PlayTrackCommand : Command { public string Query { get; set; } = string.Empty; }
+public class PlayTrackCommand : Command 
+{ 
+    public string Query { get; set; } = string.Empty; 
+    public SourceType SourceType { get; set; }
+}
 
 /// <summary>
 /// Stop the currently playing track.

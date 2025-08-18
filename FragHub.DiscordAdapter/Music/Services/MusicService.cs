@@ -31,7 +31,7 @@ public class MusicService(IAudioService _audioService) : IMusicService
         if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
         if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }        
 
-        var track = await GetTrackAsync(command.Query).ConfigureAwait(false) ?? throw new InvalidOperationException($"Track not found for query: {command.Query}");
+        var track = await GetTrackAsync(command).ConfigureAwait(false) ?? throw new InvalidOperationException($"Track not found for query: {command.Query}");
         var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
         _tracks.Add(track);
 
@@ -126,9 +126,9 @@ public class MusicService(IAudioService _audioService) : IMusicService
         return ValueTask.FromResult(new MusicPlayer(properties));
     }
 
-    private async Task<Track?> GetTrackAsync(string query, CancellationToken cancellationToken = default)
+    private async Task<Track?> GetTrackAsync(PlayTrackCommand command, CancellationToken cancellationToken = default)
     {
-        var track = await _audioService.Tracks.LoadTrackAsync(query, TrackSearchMode.YouTubeMusic, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var track = await _audioService.Tracks.LoadTrackAsync(command.Query, TrackSearchMode.YouTubeMusic, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (track is null || track.Uri is null) { return null; }
 
         return new Track()
@@ -138,7 +138,11 @@ public class MusicService(IAudioService _audioService) : IMusicService
             Author = track.Author,
             Duration = track.Duration,
             ArtworkUri = track.ArtworkUri,
-            SourceName = track.SourceName
+            SourceName = track.SourceName,
+            GuildId = command.GuildId,
+            RequestedUserId = command.UserId,
+            SourceType = command.SourceType,
+            VoiceChannelId = command.VoiceChannelId ?? 0
         };
     }
 }

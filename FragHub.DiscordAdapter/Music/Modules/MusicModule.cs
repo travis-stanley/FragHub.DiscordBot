@@ -6,17 +6,21 @@ using FragHub.Application.Abstractions;
 using FragHub.Application.Music.Commands;
 using FragHub.Domain.Env;
 using FragHub.Application.Music.Abstractions;
+using Discord.WebSocket;
 
 namespace FragHub.DiscordAdapter.Music.Modules;
+
+public enum OnOffCL
+{
+    On, Off
+}
 
 [RequireContext(ContextType.Guild)]
 [Group("music", "Music commands for playing and managing tracks")]
 public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _commandDispatcher, IVariableService _variableService, IMusicService _musicService) : InteractionModuleBase<SocketInteractionContext>
 {
-    public enum OnOffCL
-    {
-        On, Off
-    }
+    List<ulong> _embedMessageIds = [];
+    ulong? _textChannelId;
 
     #region Validation
 
@@ -34,6 +38,31 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
             return null;
         }
         return voiceState;
+    }
+
+    #endregion
+
+    #region Utility Methods
+
+    private async Task<SocketTextChannel?> GetTextChannelForPlayer()
+    {
+        // get the bot text channel from the environment variables
+        var botTextChannelName = _variableService.GetVariable(DiscordAdapter.Config.DiscordConfig.TextChannelName);
+        if (string.IsNullOrWhiteSpace(botTextChannelName))
+        {
+            await FollowupAsync("No text channel configured for the music player.").ConfigureAwait(false);
+            return null;
+        }
+
+        // find the text channel by name
+        var textChannel = Context.Guild.TextChannels.Where(w => w.Name.Contains(botTextChannelName, StringComparison.CurrentCultureIgnoreCase)).SingleOrDefault();
+        if (textChannel == null)
+        {
+            await FollowupAsync("No text channel found for the music player.").ConfigureAwait(false);
+            return null;
+        }
+
+        return textChannel;
     }
 
     #endregion
@@ -65,23 +94,9 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
         var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
         if (voiceState == null) { return; }
 
-        // get the bot text channel from the environment variables
-        var botTextChannelName = _variableService.GetVariable(DiscordAdapter.Config.DiscordConfig.TextChannelName);
-        if (string.IsNullOrWhiteSpace(botTextChannelName))
-        {
-            await FollowupAsync("No text channel configured for the music player.").ConfigureAwait(false);
-            return;
-        }
-
-        // find the text channel by name
-        var textChannel = Context.Guild.TextChannels.Where(w => w.Name.Contains(botTextChannelName, StringComparison.CurrentCultureIgnoreCase)).SingleOrDefault();
-        if (textChannel == null) {
-            await FollowupAsync("No text channel found for the music player.").ConfigureAwait(false);
-            return;
-        }
-
         var cmd = GetCommand<PlayTrackCommand>(Context, voiceState);
         cmd.Query = song_artist_url_etc;
+        cmd.SourceType = Domain.Music.Entities.SourceType.UserProvided;        
 
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
 
@@ -243,71 +258,112 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
     #region Music Player Controller
 
     private async Task RebuildPlayer()
+    {        
+        _logger.LogInformation("Rebuilding music player embed.");
+        // Get the current player embed
+        var embed = await GetPlayerEmbed();
+        if (embed is null)
+        {
+            _logger.LogError("No embed available to rebuild player.");
+            return;
+        }
+
+        var textChannel = await GetTextChannelForPlayer().ConfigureAwait(false);
+        if (textChannel is null)
+        {
+            _logger.LogError("No text channel found for the music player.");    
+            return;
+        }
+
+        // Send the embed to the text channel
+        var msg = await textChannel.SendMessageAsync(embed: embed).ConfigureAwait(false);
+        _logger.LogInformation("Player embed sent to text channel {TextChannelId} with message ID {MessageId}.", textChannel.Id, msg.Id);
+
+        _embedMessageIds.Add(msg.Id);
+    }
+
+    private async Task BreakdownPlayer()
+    {
+        _logger.LogInformation("Breaking down player, clearing tracks and stopping playback.");
+
+        var textChannel = await GetTextChannelForPlayer().ConfigureAwait(false);
+        if (textChannel is null)
+        {
+            _logger.LogError("No text channel found for the music player.");
+            return;
+        }
+
+        foreach (var messageId in _embedMessageIds)
+        {
+            var message = await textChannel.GetMessageAsync(messageId).ConfigureAwait(false);
+            if (message is not null)
+            {
+                await message.DeleteAsync().ConfigureAwait(false);
+                _logger.LogInformation("Deleted player embed message with ID {MessageId}.", messageId);
+            }
+        }
+        _embedMessageIds.Clear();
+    }
+
+    private async Task<Embed?> GetPlayerEmbed()
     {
         var tracks = _musicService.Tracks.LastOrDefault();
         if (tracks is null || tracks.Uri is null)
         {
-            _logger.LogWarning("No tracks available to rebuild player.");
-            return;
+            _logger.LogError("No tracks available to rebuild player.");
+            return null;
         }
         _logger.LogInformation("Rebuilding player with track: {TrackTitle} by {TrackAuthor}", tracks.Title, tracks.Author);
 
         var lastTrack = _musicService.Tracks.LastOrDefault();
-        if (lastTrack is null) { BreakdownPlayer(); return; }
+        if (lastTrack is null) { await BreakdownPlayer(); return null; }
 
-        //var title = $":musical_note:  Music Playing  :musical_note:  in <#{_musicService.}>";
-        //var currentArt = lastTrack.ArtworkUri is not null ? lastTrack.ArtworkUri.ToString() : "";
-        //var currentTrack = lastTrack.Title;
-        //var duration = lastTrack.Duration.ToString(@"hh\:mm\:ss");
-        //var embedUrl = lastTrack.Uri?.ToString();
-        //var thumbnailUrl = "https://media.tenor.com/vqpt7EB_tooAAAAi/music-clu.gif";
+        var title = $":musical_note:  Music Playing  :musical_note:  in <#{lastTrack.VoiceChannelId}>";
+        var currentArt = lastTrack.ArtworkUri is not null ? lastTrack.ArtworkUri.ToString() : "";
+        var currentTrack = lastTrack.Title;
+        var duration = lastTrack.Duration.ToString(@"hh\:mm\:ss");
+        var embedUrl = lastTrack.Uri?.ToString();
+        var thumbnailUrl = "https://media.tenor.com/vqpt7EB_tooAAAAi/music-clu.gif";
 
-        //var customTrack = GetTrack(lastTrack.Identifier);
-        //var requestedBy = customTrack?.GetRequestedByMention();
+        var requestedBy = $"<@{lastTrack.RequestedUserId}>";
+        if (lastTrack.SourceType == Domain.Music.Entities.SourceType.RecommendedByLastfm) { requestedBy = "Lastfm"; }          
 
-        //var embedfieldbuilds = new List<EmbedFieldBuilder>
-        //{
-        //    new()
-        //    {
-        //        Name = "Now Playing",
-        //        Value = $"{currentTrack}",
-        //        IsInline = false
-        //    },
-        //    new()
-        //    {
-        //        Name = "Artists",
-        //        Value = customTrack?.GetArtistNames(),
-        //        IsInline = false
-        //    },
-        //    new()
-        //    {
-        //        Name = "Duration",
-        //        Value = duration,
-        //        IsInline = true
-        //    },
-        //    new()
-        //    {
-        //        Name = "Added By",
-        //        Value = requestedBy,
-        //        IsInline = true
-        //    },
-        //    new()
-        //    {
-        //        Name = "Link",
-        //        Value = $"[SourceUrl]({embedUrl})",
-        //        IsInline = true
-        //    }
-        //};
+        var embedfieldbuilds = new List<EmbedFieldBuilder>
+        {
+            new()
+            {
+                Name = "Now Playing",
+                Value = $"{currentTrack}",
+                IsInline = false
+            },
+            new()
+            {
+                Name = "Artists",
+                Value = lastTrack.Author ?? "Unknown",
+                IsInline = false
+            },
+            new()
+            {
+                Name = "Duration",
+                Value = duration,
+                IsInline = true
+            },
+            new()
+            {
+                Name = "Added By",
+                Value = requestedBy,
+                IsInline = true
+            },
+            new()
+            {
+                Name = "Link",
+                Value = $"[SourceUrl]({embedUrl})",
+                IsInline = true
+            }
+        };
 
-        //var embed = new EmbedBuilder().WithColor(15835392).WithTitle(title).WithFields(embedfieldbuilds).WithThumbnailUrl(thumbnailUrl).WithImageUrl(currentArt).WithTimestamp(DateTimeOffset.Now).Build();
-    }
-
-    private void BreakdownPlayer()
-    {
-        _logger.LogInformation("Breaking down player, clearing tracks and stopping playback.");
-        // Clear the current track and stop playback
-        // todo
-    }
+        return new EmbedBuilder().WithColor(15835392).WithTitle(title).WithFields(embedfieldbuilds).WithThumbnailUrl(thumbnailUrl).WithImageUrl(currentArt).WithTimestamp(DateTimeOffset.Now).Build();
+    }   
 
     #endregion
 }
