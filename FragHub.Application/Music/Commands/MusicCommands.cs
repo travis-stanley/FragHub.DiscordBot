@@ -42,3 +42,13 @@ public class ResumeTrackCommand : Command { }
 /// Shuffle the tracks in the current playlist.
 /// </summary>
 public class ShuffleTracksCommand : Command { public bool Enabled { get; set; } }
+
+/// <summary>
+/// Get the current shuffle state of the playlist.
+/// </summary>
+public class ShuffleStateCommand : Command { }
+
+/// <summary>
+/// Get the queued tracks in the current playlist.
+/// </summary>
+public class QueuedTracksCommand : Command { }

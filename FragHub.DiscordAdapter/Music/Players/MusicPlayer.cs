@@ -22,6 +22,13 @@ public class MusicPlayer(IPlayerProperties<MusicPlayer, MusicPlayerOptions> prop
     public IEnumerable<ICommand> GetCommands() => _commands.AsReadOnly();
     private readonly List<ICommand> _commands = [];
 
+    /// <summary>
+    /// Gets the queued tracks for this player.
+    /// </summary>
+    /// <returns></returns>
+    public Track[] GetQueuedTracks() => [.. _queuedTracks];
+    private readonly List<Track> _queuedTracks = [];
+
 
     #region Event Handlers
 
@@ -91,6 +98,12 @@ public class MusicPlayer(IPlayerProperties<MusicPlayer, MusicPlayerOptions> prop
         _commands.Add(command ?? throw new ArgumentNullException(nameof(command), "Command cannot be null."));
 
         this.Shuffle = enabled;
+    }
+
+    public bool GetShuffleState(ICommand command)
+    {
+        _commands.Add(command ?? throw new ArgumentNullException(nameof(command), "Command cannot be null."));
+        return this.Shuffle;
     }
 
     #endregion

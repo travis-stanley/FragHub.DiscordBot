@@ -16,6 +16,8 @@ public interface IMusicPlayer
     Task PauseAsync(ICommand command);
     Task ResumeAsync(ICommand command);    
     void SetShuffle(ICommand command, bool enabled);
+    bool GetShuffleState(ICommand command);
 
+    Track[] GetQueuedTracks();
     IEnumerable<ICommand> GetCommands();
 }

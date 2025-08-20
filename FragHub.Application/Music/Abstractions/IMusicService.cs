@@ -18,4 +18,6 @@ public interface IMusicService
     Task PauseAsync(PauseTrackCommand command);
     Task ResumeAsync(ResumeTrackCommand command);
     Task SetShuffleAsync(ShuffleTracksCommand command);
+    Task<bool> GetShuffleState(ShuffleStateCommand command);
+    Task<Track[]> GetQueuedTracks(QueuedTracksCommand command);
 }

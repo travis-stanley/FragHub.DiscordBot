@@ -1,5 +1,6 @@
 ﻿using FragHub.Application.Music.Abstractions;
 using FragHub.Application.Music.Commands;
+using FragHub.Application.Users.Commands;
 using FragHub.DiscordAdapter.Music.Players;
 using FragHub.Domain.Music.Entities;
 using Lavalink4NET;
@@ -94,6 +95,27 @@ public class MusicService(IAudioService _audioService) : IMusicService
         player.SetShuffle(command, command.Enabled);
     }
 
+    public async Task<bool> GetShuffleState(ShuffleStateCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command, nameof(command));
+        if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
+        if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
+
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
+
+        return player.GetShuffleState(command);
+    }
+
+    public async Task<Track[]> GetQueuedTracks(QueuedTracksCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command, nameof(command));
+        if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
+        if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
+
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value, connectToVoiceChannel: false).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
+        return player.GetQueuedTracks();
+    }
+
 
     /// <summary>
     ///     Get a music player for the specified options.
@@ -133,6 +155,7 @@ public class MusicService(IAudioService _audioService) : IMusicService
 
         return new Track()
         {
+            Identifier = track.Identifier,
             Uri = track.Uri,
             Title = track.Title,
             Author = track.Author,

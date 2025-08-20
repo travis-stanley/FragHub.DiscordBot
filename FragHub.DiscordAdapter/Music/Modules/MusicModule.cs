@@ -1,12 +1,13 @@
 ﻿using Discord;
 using Discord.Interactions;
-using Microsoft.Extensions.Logging;
+using Discord.WebSocket;
 using FragHub.Application;
 using FragHub.Application.Abstractions;
+using FragHub.Application.Music.Abstractions;
 using FragHub.Application.Music.Commands;
 using FragHub.Domain.Env;
-using FragHub.Application.Music.Abstractions;
-using Discord.WebSocket;
+using Lavalink4NET.Clients;
+using Microsoft.Extensions.Logging;
 
 namespace FragHub.DiscordAdapter.Music.Modules;
 
@@ -19,6 +20,7 @@ public enum OnOffCL
 [Group("music", "Music commands for playing and managing tracks")]
 public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher _commandDispatcher, IVariableService _variableService, IMusicService _musicService) : InteractionModuleBase<SocketInteractionContext>
 {
+    List<string> _reactedComponents = [];
     List<ulong> _embedMessageIds = [];
     ulong? _textChannelId;
 
@@ -213,7 +215,7 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
     /// </summary>
     /// <returns></returns>
     [SlashCommand("shuffle", description: "Resume playing the current track", runMode: RunMode.Async)]
-    public async Task Resume(OnOffCL shuffle)
+    public async Task Shuffle(OnOffCL shuffle)
     {
         // follow up calls are tied to first, thus follow ephemeral of first
         await DeferAsync(ephemeral: true).ConfigureAwait(false);
@@ -257,6 +259,10 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
 
     #region Music Player Controller
 
+    /// <summary>
+    /// re/Builds the music player embed and sends it to the text channel.
+    /// </summary>
+    /// <returns></returns>
     private async Task RebuildPlayer()
     {        
         _logger.LogInformation("Rebuilding music player embed.");
@@ -265,6 +271,13 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
         if (embed is null)
         {
             _logger.LogError("No embed available to rebuild player.");
+            return;
+        }
+
+        var msgComponents = await GetPlayerComponents();
+        if (msgComponents is null)
+        {
+            _logger.LogError("Could not build player components.");
             return;
         }
 
@@ -282,9 +295,13 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
         _embedMessageIds.Add(msg.Id);
     }
 
+    /// <summary>
+    /// Breakdown the music player controller.
+    /// </summary>
+    /// <returns></returns>
     private async Task BreakdownPlayer()
     {
-        _logger.LogInformation("Breaking down player, clearing tracks and stopping playback.");
+        _logger.LogInformation("Breaking down player.");
 
         var textChannel = await GetTextChannelForPlayer().ConfigureAwait(false);
         if (textChannel is null)
@@ -305,6 +322,10 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
         _embedMessageIds.Clear();
     }
 
+    /// <summary>
+    /// Builds out the player embed with the current track information and controls.
+    /// </summary>
+    /// <returns></returns>
     private async Task<Embed?> GetPlayerEmbed()
     {
         var tracks = _musicService.Tracks.LastOrDefault();
@@ -363,7 +384,115 @@ public sealed class MusicModule(ILogger<MusicModule> _logger, CommandDispatcher 
         };
 
         return new EmbedBuilder().WithColor(15835392).WithTitle(title).WithFields(embedfieldbuilds).WithThumbnailUrl(thumbnailUrl).WithImageUrl(currentArt).WithTimestamp(DateTimeOffset.Now).Build();
-    }   
+    }
+
+    /// <summary>
+    /// Gets the player components for the music player embed.
+    /// </summary>
+    /// <returns></returns>
+    private async Task<MessageComponent?> GetPlayerComponents()
+    {
+        var msgComponent = new ComponentBuilder();
+        msgComponent.AddRow(await GetPlayerControls());
+        msgComponent.AddRow(await GetQueueMenu());
+        //AddRecommendations(msgComponent);
+
+        return msgComponent.Build();
+    }
+
+    /// <summary>
+    /// Builds the controls for the player.
+    /// </summary>
+    /// <returns></returns>
+    private async Task<ActionRowBuilder> GetPlayerControls()
+    {
+        var shuffleState = await _musicService.GetShuffleState(new ShuffleStateCommand());
+
+        var playerActionRow = new ActionRowBuilder();
+        playerActionRow.WithButton("Skip", customId: "PlayerSkip", emote: new Emoji("\u23E9"), disabled: _reactedComponents.Contains("PlayerSkip"));
+
+        if (shuffleState)
+            playerActionRow.WithButton("Standard", "PlayerShuffle", ButtonStyle.Primary, emote: new Emoji("\u27A1"), disabled: _reactedComponents.Contains("PlayerShuffle"));
+        else
+            playerActionRow.WithButton("Shuffle", "PlayerShuffle", ButtonStyle.Primary, emote: new Emoji("\uD83D\uDD00"), disabled: _reactedComponents.Contains("PlayerShuffle"));
+
+        playerActionRow.WithButton("Stop", "PlayerStop", ButtonStyle.Danger, emote: new Emoji("\u2716"), disabled: _reactedComponents.Contains("PlayerStop"));
+        playerActionRow.WithButton("Next Up", "PlayerQueueBtn", ButtonStyle.Secondary, new Emoji("\u2935"), disabled: true);
+
+        return playerActionRow;
+    }
+
+    /// <summary>
+    /// Builds the queue menu for the player.
+    /// </summary>
+    /// <returns></returns>
+    private async Task<ActionRowBuilder> GetQueueMenu()
+    {
+        var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
+        if (voiceState == null) { return new ActionRowBuilder(); } // no voice state, no queue menu
+
+        var cmd = GetCommand<QueuedTracksCommand>(Context, voiceState);
+        var queuedTracks = await _musicService.GetQueuedTracks(cmd);
+
+        var customId = "PlayerQueue";
+        var queueMenu = new SelectMenuBuilder().WithCustomId(customId).WithMinValues(1).WithMaxValues(1);
+
+        if (_reactedComponents.Contains(customId)) { queueMenu.IsDisabled = true; }
+
+        if (queuedTracks.Length > 0)
+        {
+            for (int x = 0; x < queuedTracks.Count(); x++)
+            {
+                var customTrack = queuedTracks[x];
+                var requestedBy = $"<@{customTrack.RequestedUserId}>";
+                var trackName = customTrack?.Title ?? "Unknown Track";
+                var artistName = customTrack?.Author ?? "Unknown Artist";
+
+                var label = $"{trackName} - {artistName}";
+                if (label.Length > 80) { label = label[..80]; }
+
+                if (x == 0)
+                    queueMenu.AddOption(label, queuedTracks[x].Identifier, $"Queue position {x + 1} ({requestedBy})", isDefault: true);
+                else
+                    queueMenu.AddOption(label, queuedTracks[x].Identifier, $"Queue position {x + 1} ({requestedBy})");
+            }
+        }
+        else
+        {
+            queueMenu.AddOption($"Queue is empty", "Empty", "Play more songs to update the queue", isDefault: true);
+        }
+
+        var playerQueueRow = new ActionRowBuilder().WithSelectMenu(queueMenu);
+        return playerQueueRow;
+    }
+
+    /// <summary>
+    /// Builds the recommendation actions for the player.
+    /// </summary>
+    /// <param name="componentBuilder"></param>
+    private void GetRecommendationActions(ComponentBuilder componentBuilder)
+    {
+        var recActionRow = new ActionRowBuilder();
+        recActionRow.WithButton("Lastfm Recommendations", "PlayerRecLabelBtn", ButtonStyle.Success, new Emoji("\U0001F4FB"), disabled: true);
+        componentBuilder.AddRow(recActionRow);
+
+        var addedEmoji = new Emoji("\u2705");
+        var addEmoji = new Emoji("\u2795");
+
+        var recRecRow = new ActionRowBuilder();
+        //for (int x = 0; x < nextRecommended.Take(5).ToList().Count; x++)
+        //{
+        //    var label = $"{nextRecommended[x].TrackName} - {nextRecommended[x].Artist?.Name}";
+        //    var customId = $"PlayerAddRec{x + 1}Btn";
+        //    var disabled = disabledCustomIds.Contains(customId);
+        //    var emoteToUse = disabledCustomIds.Contains(customId) ? addedEmoji : addEmoji;
+
+        //    if (label.Length > 80) { label = label[..80]; }
+
+        //    recRecRow.WithButton(label, customId, ButtonStyle.Secondary, emoteToUse, disabled: disabled);
+        //}
+        componentBuilder.AddRow(recRecRow);
+    }
 
     #endregion
 }

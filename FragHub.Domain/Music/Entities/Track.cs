@@ -15,6 +15,7 @@ public enum SourceType
 public class Track
 {
     public Guid Id { get; } = Guid.NewGuid();
+    public string? Identifier { get; set; } // Unique identifier for the track, e.g., YouTube video ID, Spotify URI, etc.
 
     public Uri? Uri { get; set; }
 
