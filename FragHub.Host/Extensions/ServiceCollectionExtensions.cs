@@ -144,7 +144,7 @@ public static class ServiceCollectionExtensions
     /// Adds music-related services to the specified <see cref="IServiceCollection"/>.
     /// </summary>
     /// <remarks>This method registers the following services as singletons: <list type="bullet">
-    /// <item><description><see cref="IMusicService"/> implemented by <see cref="MusicService"/>.</description></item>
+    /// <item><description><see cref="IMusicService"/> implemented by <see cref="DiscordMusicService"/>.</description></item>
     /// <item><description><see cref="ISearchService"/> implemented by <see cref="SearchService"/>.</description></item>
     /// </list> Use this method to configure music-related functionality in your application's dependency injection
     /// container.</remarks>
@@ -152,7 +152,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The <see cref="IServiceCollection"/> instance with the music services registered.</returns>
     public static IServiceCollection AddMusicServices(this IServiceCollection services)
     {
-        services.AddSingleton<IMusicService, MusicService>();        
+        services.AddSingleton<IMusicService, DiscordMusicService>();        
 
         return services;
     }
