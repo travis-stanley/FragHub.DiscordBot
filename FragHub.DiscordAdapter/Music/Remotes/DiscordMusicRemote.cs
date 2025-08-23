@@ -13,10 +13,13 @@ using Microsoft.Extensions.Logging;
 namespace FragHub.DiscordAdapter.Music.Remotes;
 
 
-public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicService _musicService, DiscordSocketClient _discordClient, string guildId, string textChannelName) : IMusicRemote
+public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicService _musicService, IPlayerSettings _playerSettings, DiscordSocketClient _discordClient, string guildId, string textChannelName) : IMusicRemote
 {    
     private List<string> _reactedComponents = [];
     private List<ulong> _embedMessageIds = [];
+
+
+    public IPlayerSettings PlayerSettings { get => _playerSettings; set => _playerSettings = value; }
 
     public string GuildId => guildId;
 
@@ -62,7 +65,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     /// <exception cref="NotImplementedException"></exception>
     public async Task OnTrackStarted()
     {
-        await RefreshRemote().ConfigureAwait(false);
+        await RefreshRemote(false).ConfigureAwait(false);
     }
 
     public async Task OnInteractionHandled()
@@ -70,15 +73,12 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         await RefreshRemoteButtons().ConfigureAwait(false);
     }
 
-    public Task OnStateChanged(PlayerState state)
+    public async Task OnStateChanged(PlayerState state)
     {
-        // todo -- disable components if inactive, except for recommendations
-        //await RefreshPlayerComponents().ConfigureAwait(false);
-
-        // if player is marked as inactive, the player will be disconnected.
-        // - could show a list of songs that were played during that session
-
-        return Task.Run(() => { });
+        if (state == PlayerState.Inactive)
+        {
+            await RefreshRemote(true).ConfigureAwait(false);            
+        }
     }
 
     public Task OnPlayerTracked()
@@ -121,12 +121,11 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     /// re/Builds the music player embed and sends it to the text channel.
     /// </summary>
     /// <returns></returns>
-    private async Task RefreshRemote()
+    private async Task RefreshRemote(bool isInactive)
     {
         await DeleteRemote().ConfigureAwait(false);
 
-        // Get the current player embed
-        var embed = await BuildRemoteEmbed();
+        var embed = isInactive ? BuildRemoteEmbedNothingPlaying() : await BuildRemoteEmbed();            
         if (embed is null)
         {
             _logger.LogError("No embed available to rebuild player.");
@@ -152,6 +151,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         _logger.LogInformation("Player embed sent to text channel {TextChannelId} with message ID {MessageId}.", textChannel.Id, msg.Id);
 
         _embedMessageIds.Add(msg.Id);
+        _reactedComponents.Clear();
     }
 
     /// <summary>
@@ -239,6 +239,27 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     }
 
     /// <summary>
+    /// Build embed for remote when nothing is playing
+    /// </summary>
+    /// <returns></returns>
+    private Embed? BuildRemoteEmbedNothingPlaying()
+    {        
+        var title = $"Nothing to Play";
+
+        var embedfieldbuilds = new List<EmbedFieldBuilder>
+        {
+            new()
+            {
+                Name = "Add",
+                Value = $"Use music slash commands to add tracks",
+                IsInline = false
+            }
+        };
+
+        return new EmbedBuilder().WithColor(15835392).WithTitle(title).WithFields(embedfieldbuilds).WithTimestamp(DateTimeOffset.Now).Build();
+    }
+
+    /// <summary>
     /// Gets the player components for the music player embed.
     /// </summary>
     /// <returns></returns>
@@ -247,7 +268,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         var msgComponent = new ComponentBuilder();
         msgComponent.AddRow(GetPlayerControls());
         msgComponent.AddRow(GetQueueMenu());
-        //AddRecommendations(msgComponent);
+        AddRecommendationActions(msgComponent);
 
         return msgComponent.Build();
     }
@@ -257,18 +278,16 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     /// </summary>
     /// <returns></returns>
     private ActionRowBuilder GetPlayerControls()
-    {
-        // todo - solve shuffle state without sending a command
-
-        var shuffleState = true; //await _musicService.GetShuffleState(new ShuffleStateCommand() { GuildId = guildId, UserId = cmd.UserId, VoiceChannelId = cmd.VoiceChannelId, TextChannelId = cmd.TextChannelId });
+    {        
+        var shuffleState = PlayerSettings.IsShuffling;
 
         var playerActionRow = new ActionRowBuilder();
         playerActionRow.WithButton("Skip", customId: "PlayerSkip", emote: new Emoji("\u23E9"), disabled: _reactedComponents.Contains("PlayerSkip"));
 
         if (shuffleState)
-            playerActionRow.WithButton("Standard", "PlayerShuffle", ButtonStyle.Primary, emote: new Emoji("\u27A1"), disabled: _reactedComponents.Contains("PlayerShuffle"));
+            playerActionRow.WithButton("Standard", "PlayerShuffleOff", ButtonStyle.Primary, emote: new Emoji("\u27A1"), disabled: _reactedComponents.Contains("PlayerShuffleOff"));
         else
-            playerActionRow.WithButton("Shuffle", "PlayerShuffle", ButtonStyle.Primary, emote: new Emoji("\uD83D\uDD00"), disabled: _reactedComponents.Contains("PlayerShuffle"));
+            playerActionRow.WithButton("Shuffle", "PlayerShuffleOn", ButtonStyle.Primary, emote: new Emoji("\uD83D\uDD00"), disabled: _reactedComponents.Contains("PlayerShuffleOn"));
 
         playerActionRow.WithButton("Stop", "PlayerStop", ButtonStyle.Danger, emote: new Emoji("\u2716"), disabled: _reactedComponents.Contains("PlayerStop"));
         playerActionRow.WithButton("Next Up", "PlayerQueueBtn", ButtonStyle.Secondary, new Emoji("\u2935"), disabled: true);
@@ -298,6 +317,8 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
                 var trackName = customTrack?.Title ?? "Unknown Track";
                 var artistName = customTrack?.Author ?? "Unknown Artist";
 
+                if (customTrack?.SourceType == SourceType.RecommendedByLastfm) { requestedBy = "Lastfm"; }
+
                 var label = $"{trackName} - {artistName}";
                 if (label.Length > 80) { label = label[..80]; }
 
@@ -320,7 +341,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     /// Builds the recommendation actions for the player.
     /// </summary>
     /// <param name="componentBuilder"></param>
-    private void GetRecommendationActions(ComponentBuilder componentBuilder)
+    private void AddRecommendationActions(ComponentBuilder componentBuilder)
     {
         var recActionRow = new ActionRowBuilder();
         recActionRow.WithButton("Lastfm Recommendations", "PlayerRecLabelBtn", ButtonStyle.Success, new Emoji("\U0001F4FB"), disabled: true);
@@ -329,25 +350,21 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         var addedEmoji = new Emoji("\u2705");
         var addEmoji = new Emoji("\u2795");
 
+        var nextRecommended = _musicService.GetRecommendations(guildId);
+
         var recRecRow = new ActionRowBuilder();
-        //for (int x = 0; x < nextRecommended.Take(5).ToList().Count; x++)
-        //{
-        //    var label = $"{nextRecommended[x].TrackName} - {nextRecommended[x].Artist?.Name}";
-        //    var customId = $"PlayerAddRec{x + 1}Btn";
-        //    var disabled = disabledCustomIds.Contains(customId);
-        //    var emoteToUse = disabledCustomIds.Contains(customId) ? addedEmoji : addEmoji;
+        for (int x = 0; x < nextRecommended.Take(5).ToList().Count; x++)
+        {
+            var label = $"{nextRecommended[x].Title} - {nextRecommended[x].Author}";
+            var customId = $"PlayerAddRec{x + 1}Btn";
+            var disabled = _reactedComponents.Contains(customId);
+            var emoteToUse = _reactedComponents.Contains(customId) ? addedEmoji : addEmoji;
 
-        //    if (label.Length > 80) { label = label[..80]; }
+            if (label.Length > 80) { label = label[..80]; }
 
-        //    recRecRow.WithButton(label, customId, ButtonStyle.Secondary, emoteToUse, disabled: disabled);
-        //}
+            recRecRow.WithButton(label, customId, ButtonStyle.Secondary, emoteToUse, disabled: disabled);
+        }
         componentBuilder.AddRow(recRecRow);
-    }
-
-    public void SetNextRecommended(IEnumerable<Track> recommendedTracks)
-    {
-        //this.nextRecommended = recommendedTracks.ToList();
-        _reactedComponents.Clear();
     }
 
     #endregion

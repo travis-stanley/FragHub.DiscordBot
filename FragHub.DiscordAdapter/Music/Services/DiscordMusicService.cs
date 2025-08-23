@@ -1,4 +1,5 @@
-﻿using Discord.WebSocket;
+﻿using Discord;
+using Discord.WebSocket;
 using FragHub.Application.Abstractions;
 using FragHub.Application.Music.Abstractions;
 using FragHub.Application.Music.Commands;
@@ -14,12 +15,13 @@ using Microsoft.Extensions.Options;
 
 namespace FragHub.DiscordAdapter.Music.Services;
 
-public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _audioService, DiscordSocketClient _discordClient, IVariableService _variableService) : IMusicService
+public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _audioService, DiscordSocketClient _discordClient, IVariableService _variableService, IMusicRecommendationService _musicRecommendationService) : IMusicService
 {
     private readonly Dictionary<string, List<ICommand>> _commands = [];
     private readonly Dictionary<string, List<IMusicRemote>> _remotes = [];
     private readonly Dictionary<string, List<Track>> _tracks = [];
     private readonly Dictionary<string, Queue<Track>> _queuedTracks = [];
+    private readonly Dictionary<string, List<Track>> _recommendations = [];
 
     #region Remotes
 
@@ -29,8 +31,6 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
     }
     public IEnumerable<T> AddRemote<T>(string playerId, T remote) where T : IMusicRemote
     {
-        Console.WriteLine("ADDING REMOTE --- ---- -- -");
-
         ArgumentNullException.ThrowIfNull(remote, nameof(remote));
         if (!_remotes.TryGetValue(playerId, out List<IMusicRemote>? value)) { value = []; _remotes[playerId] = value; }
         value.Add(remote);
@@ -46,13 +46,13 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
     {
         _logger.LogInformation("Player tracked: {PlayerId}", id);
         var remotes = GetRemotes<DiscordMusicRemote>(id);
-        foreach (var remote in remotes) { await remote.OnPlayerTracked(); }
+        foreach (var remote in remotes) { await remote.OnPlayerTracked(); remote.PlayerSettings.PlayerState = Application.Music.Abstractions.PlayerState.Stopped; }
     }
     public async Task NotifyStateChanged(string id, Application.Music.Abstractions.PlayerState state)
     {
         _logger.LogInformation("Player state changed: {PlayerId}, State: {State}", id, state);
         var remotes = GetRemotes<DiscordMusicRemote>(id);
-        foreach (var remote in remotes) { await remote.OnStateChanged(state); }
+        foreach (var remote in remotes) { await remote.OnStateChanged(state); remote.PlayerSettings.PlayerState = state; }
     }
     public async Task NotifyTrackStarted(string id)
     {
@@ -60,9 +60,10 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         var playerQueue = GetQueuedTracks(id);
         var nextTrack = playerQueue.Dequeue();
         AddTrack(id, nextTrack);
+        await RefreshRecommendations(id, nextTrack);
 
         var remotes = GetRemotes<DiscordMusicRemote>(id);
-        foreach (var remote in remotes) { await remote.OnTrackStarted(); }
+        foreach (var remote in remotes) { await remote.OnTrackStarted(); remote.PlayerSettings.PlayerState = Application.Music.Abstractions.PlayerState.Playing; }
     }
     public async Task NotifyInteractionHandled(string id)
     {
@@ -111,6 +112,28 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
     #endregion
 
 
+    #region Recommendations
+
+    public Track[] GetRecommendations(string playerId) => _recommendations.TryGetValue(playerId, out List<Track>? value) ? [.. value] : [];
+    private void SetRecommendations(string playerId, Track[] tracks)
+    {
+        ArgumentNullException.ThrowIfNull(tracks, nameof(tracks));
+        if (!_recommendations.TryGetValue(playerId, out List<Track>? value)) { value = []; _recommendations[playerId] = value; }
+        _recommendations[playerId] = [.. tracks];
+    }
+
+    private async Task RefreshRecommendations(string playerId, Track? playingTrack)
+    {
+        if (playingTrack == null) { return; }
+        var tracks = await _musicRecommendationService.GetRecommendations(5, playingTrack).ConfigureAwait(false);
+
+        if (tracks == null) { return; }
+        SetRecommendations(playerId, [.. tracks]);
+    }
+
+    #endregion
+
+
     #region Commands
 
     /// <summary>
@@ -129,12 +152,14 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         var track = await GetTrackAsync(command).ConfigureAwait(false) ?? throw new InvalidOperationException($"Track not found for query: {command.Query}");
         var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
         
-        EnqueueTrack(command.GuildId.ToString(), track);
-        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+        EnqueueTrack(command.GuildId.ToString(), track);        
+
+        var remotes = GetRemotes<DiscordMusicRemote>(command.GuildId.ToString());
+        foreach (var remote in remotes) { remote.PlayerSettings.PlayerState = Application.Music.Abstractions.PlayerState.Playing; }
 
         await player.PlayAsync(command, track).ConfigureAwait(false);
+        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
     }
-
 
     public async Task StopAsync(StopTrackCommand command)
     {
@@ -142,12 +167,16 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
         if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
 
-        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
-        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+        var currentTrack = GetTracks(command.GuildId.ToString()).LastOrDefault();
+        if (currentTrack != null) { currentTrack.WasPlayed = false; currentTrack.LastInteractedUserId = command.UserId; }
 
-        // todo -- mark track as stopped and by who
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");        
+
+        var remotes = GetRemotes<DiscordMusicRemote>(command.GuildId.ToString());
+        foreach (var remote in remotes) { remote.PlayerSettings.PlayerState = Application.Music.Abstractions.PlayerState.Stopped; }
 
         await player.StopAsync(command).ConfigureAwait(false);
+        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
     }
 
     public async Task SkipAsync(SkipTrackCommand command)
@@ -156,11 +185,13 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
         if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
 
+        var currentTrack = GetTracks(command.GuildId.ToString()).LastOrDefault();
+        if (currentTrack != null) { currentTrack.WasPlayed = false; currentTrack.WasSkipped = true; currentTrack.LastInteractedUserId = command.UserId; }
+
         var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
 
-        // todo -- mark track as skipped and by who
-
         await player.SkipAsync(command).ConfigureAwait(false);
+        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
     }
 
     public async Task PauseAsync(PauseTrackCommand command)
@@ -169,12 +200,16 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
         if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
 
-        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
-        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+        var currentTrack = GetTracks(command.GuildId.ToString()).LastOrDefault();
+        if (currentTrack != null) { currentTrack.WasPlayed = false; currentTrack.LastInteractedUserId = command.UserId; }
 
-        // todo -- mark track as paused and by who
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");        
+
+        var remotes = GetRemotes<DiscordMusicRemote>(command.GuildId.ToString());
+        foreach (var remote in remotes) { remote.PlayerSettings.PlayerState = Application.Music.Abstractions.PlayerState.Paused; }
 
         await player.PauseAsync(command).ConfigureAwait(false);
+        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
     }
 
     public async Task ResumeAsync(ResumeTrackCommand command)
@@ -183,12 +218,16 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
         if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
 
-        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
-        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+        var currentTrack = GetTracks(command.GuildId.ToString()).LastOrDefault();
+        if (currentTrack != null) { currentTrack.WasPlayed = true; currentTrack.LastInteractedUserId = command.UserId; }
 
-        // todo -- mark track as resumed and by who
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");        
+
+        var remotes = GetRemotes<DiscordMusicRemote>(command.GuildId.ToString());
+        foreach (var remote in remotes) { remote.PlayerSettings.PlayerState = Application.Music.Abstractions.PlayerState.Playing; }
 
         await player.ResumeAsync(command).ConfigureAwait(false);
+        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
     }
 
     public async Task SetShuffleAsync(ShuffleTracksCommand command)
@@ -197,25 +236,48 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
         if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
 
-        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
-        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");        
+
+        var remotes = GetRemotes<DiscordMusicRemote>(command.GuildId.ToString());
+        foreach (var remote in remotes) { remote.PlayerSettings.IsShuffling = command.Enabled; }
 
         player.SetShuffle(command, command.Enabled);
+        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
     }
 
-    public async Task<bool> GetShuffleState(ShuffleStateCommand command)
+    public async Task MoveToTopOfQueueAsync(MoveToTopOfQueueCommand command)
     {
         ArgumentNullException.ThrowIfNull(command, nameof(command));
         if (!command.VoiceChannelId.HasValue) { throw new ArgumentNullException(nameof(command.VoiceChannelId), "VoiceChannelId must be provided."); }
         if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
 
-        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
+        var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");        
 
-        return player.GetShuffleState(command);
+        var playerQueue = GetQueuedTracks(command.GuildId.ToString());
+        var track = playerQueue.Where(t => t.Identifier == command.TrackIdentifier).FirstOrDefault();
+        if (track != null)
+        {
+            var newQueue = new Queue<Track>();
+            newQueue.Enqueue(track);
+            foreach (var other in playerQueue)
+            {
+                if (other.Identifier == command.TrackIdentifier) { continue; }
+                newQueue.Enqueue(other);
+            }
+            playerQueue = newQueue;
+        }
+        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+    }
+
+    public async Task AddRecommendationAsync(AddRecommendationCommand command)
+    {
+        var playCmd = new PlayTrackCommand() { GuildId = command.GuildId, UserId = command.UserId, VoiceChannelId = command.VoiceChannelId, TextChannelId = command.TextChannelId, SourceType = command.SourceType, Query = command.Query };
+        await PlayAsync(playCmd).ConfigureAwait(false);
+
+        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
     }
 
     #endregion
-
 
     #region Player Management
 
@@ -255,12 +317,13 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (remotes == null || !remotes.Any())
         {
             var botTextChannelName = _variableService.GetVariable(Config.DiscordConfig.TextChannelName) ?? string.Empty;
-            var remote = new DiscordMusicRemote(_logger, this, _discordClient, guildId.ToString(), botTextChannelName);
-            AddRemote(guildId.ToString(), remote);
+            var remote = new DiscordMusicRemote(_logger, this, new LavalinkPlayerSettings(), _discordClient, guildId.ToString(), botTextChannelName);
+            remotes = AddRemote(guildId.ToString(), remote);
         }
 
         // Set the player options such as volume, etc.
-        await result.Player.SetVolumeAsync(0.25f).ConfigureAwait(false);        
+        await result.Player.SetVolumeAsync(0.25f).ConfigureAwait(false);
+        foreach (var item in remotes) { item.PlayerSettings.Volume = 0.25f; }
 
         return result.Player;
     }

@@ -8,11 +8,6 @@ using System.Threading.Tasks;
 
 namespace FragHub.Application.Music.Abstractions
 {
-    public enum PlayerState
-    {
-        Active,
-        Inactive,
-    }
 
     /// <summary>
     /// Defines the contract for a remote control interface for music playback.
@@ -20,7 +15,9 @@ namespace FragHub.Application.Music.Abstractions
     /// </summary>
     public interface IMusicRemote
     {
-        string GuildId { get; }                
+        string GuildId { get; }
+
+        IPlayerSettings PlayerSettings { get; set; }
 
         /// <summary>
         /// The music player notifies the remote that a track has started playing.

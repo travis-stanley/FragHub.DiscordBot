@@ -100,12 +100,6 @@ public sealed class LavalinkPlayer(IPlayerProperties<LavalinkPlayer, LavalinkPla
         this.Shuffle = enabled;
     }
 
-    public bool GetShuffleState(ICommand command)
-    {
-        _musicService?.AddCommand(Id, command ?? throw new ArgumentNullException(nameof(command), "Command cannot be null."));
-        return this.Shuffle;
-    }
-
     #endregion
 
 }

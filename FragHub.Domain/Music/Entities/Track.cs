@@ -38,5 +38,7 @@ public class Track
     public bool WasSkipped { get; set; }
     public bool WasPlayed { get; set; }
 
+    public ulong? LastInteractedUserId { get; set; }
+
     public DateTime DateRequested { get; init; } = DateTime.UtcNow;
 }

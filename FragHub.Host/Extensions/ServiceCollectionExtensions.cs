@@ -13,6 +13,7 @@ using FragHub.DiscordAdapter.Users.Services;
 using FragHub.Infrastructure.Config;
 using FragHub.Infrastructure.Data;
 using FragHub.Infrastructure.Env;
+using FragHub.Infrastructure.Music.Lastfm;
 using FragHub.Infrastructure.Repositories;
 using Lavalink4NET.Extensions;
 using Lavalink4NET.InactivityTracking;
@@ -136,6 +137,13 @@ public static class ServiceCollectionExtensions
         {
             config.Timeout = TimeSpan.FromMinutes(1);
         });
+
+        return services;
+    }
+
+    public static IServiceCollection AddRecommendationServices(this IServiceCollection services)
+    {
+        services.AddSingleton<IMusicRecommendationService, LastfmRecommendationService>();
 
         return services;
     }

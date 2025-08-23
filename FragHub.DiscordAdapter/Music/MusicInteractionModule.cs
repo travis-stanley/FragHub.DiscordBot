@@ -8,6 +8,7 @@ using FragHub.Application.Music.Commands;
 using FragHub.Domain.Env;
 using FragHub.Domain.Music.Entities;
 using Lavalink4NET.Clients;
+using Lavalink4NET.Rest.Entities.Tracks;
 using Microsoft.Extensions.Logging;
 
 namespace FragHub.DiscordAdapter.Music;
@@ -130,6 +131,11 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
 
         await FollowupAsync($"Track stopped").ConfigureAwait(false);
     }
+    [ComponentInteraction("PlayerStop")]
+    public async Task BtnPlayerStop()
+    {
+        await Stop().ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Register a command to skip the current track.
@@ -151,6 +157,11 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
 
         await FollowupAsync($"Track skipped").ConfigureAwait(false);
+    }
+    [ComponentInteraction("PlayerSkip")]
+    public async Task BtnPlayerSkip()
+    {
+        await Skip().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -220,7 +231,88 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
         var state = cmd.Enabled ? "enabled" : "disabled";
         await FollowupAsync($"Shuffed {state}").ConfigureAwait(false);
     }
+    [ComponentInteraction("PlayerShuffleOn")]
+    public async Task BtnPlayerShuffleOn()
+    {
+        await Shuffle(OnOffCL.On);
+    }
+    [ComponentInteraction("PlayerShuffleOff")]
+    public async Task BtnPlayerShuffleOff()
+    {
+        await Shuffle(OnOffCL.Off);
+    }
 
+    [ComponentInteraction("PlayerQueue")]
+    public async Task BtnPlayerMoveToTopOfQueue(string trackIdentifier)
+    {
+        await DeferAsync().ConfigureAwait(false);
+
+        _logger.LogInformation("Received move to top of queue command: from {User}", Context.User.Username);
+
+        // check if user is in a voice channel
+        var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
+        if (voiceState == null) { return; }
+
+        var cmd = GetCommand<MoveToTopOfQueueCommand>(Context, voiceState);
+        cmd.TrackIdentifier = trackIdentifier;
+        await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
+
+        await FollowupAsync($"Track moved to top of queue, by {Context.User.Mention}").ConfigureAwait(false);
+    }
+    [ComponentInteraction("PlayerAddRec1Btn")]
+    public async Task BtnPlayerAddRec1()
+    {
+        await AddRecommendation(1);
+    }
+    [ComponentInteraction("PlayerAddRec2Btn")]
+    public async Task BtnPlayerAddRec2()
+    {
+        await AddRecommendation(2);
+    }
+    [ComponentInteraction("PlayerAddRec3Btn")]
+    public async Task BtnPlayerAddRec3()
+    {
+        await AddRecommendation(3);
+    }
+    [ComponentInteraction("PlayerAddRec4Btn")]
+    public async Task BtnPlayerAddRec4()
+    {
+        await AddRecommendation(4);
+    }
+    [ComponentInteraction("PlayerAddRec5Btn")]
+    public async Task BtnPlayerAddRec5()
+    {
+        await AddRecommendation(5);
+    }
+
+    async Task AddRecommendation(int option)
+    {
+        await DeferAsync(ephemeral: true).ConfigureAwait(false);
+
+        _logger.LogInformation("Received add recommendation command: from {User}", Context.User.Username);
+
+        // check if user is in a voice channel
+        var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
+        if (voiceState == null) { return; }
+
+        var recommendedTracks = _musicService.GetRecommendations(Context.Guild.Id.ToString());
+        if (recommendedTracks is null) { return; }
+
+        if (option < 1 || option > 5) { return; }
+        if (recommendedTracks.Count() < 5 && option == 5) { return; }
+        if (recommendedTracks.Count() < 4 && option == 4) { return; }
+        if (recommendedTracks.Count() < 3 && option == 3) { return; }
+        if (recommendedTracks.Count() < 2 && option == 2) { return; }
+        if (recommendedTracks.Any() && option == 1) { return; }
+        Track recommendedTrack = recommendedTracks.ToArray()[option - 1];
+
+        if (recommendedTrack is null || recommendedTrack.Uri is null) { return; }
+
+        var cmd = GetCommand<AddRecommendationCommand>(Context, voiceState);
+        cmd.BtnId = $"PlayerAddRec{option}Btn";
+        cmd.Query = recommendedTrack.Uri.ToString();
+        await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Utility method to create a command instance with the necessary context information.

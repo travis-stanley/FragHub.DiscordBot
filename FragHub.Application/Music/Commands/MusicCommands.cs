@@ -43,12 +43,6 @@ public class ResumeTrackCommand : Command { }
 /// </summary>
 public class ShuffleTracksCommand : Command { public bool Enabled { get; set; } }
 
-/// <summary>
-/// Get the current shuffle state of the playlist.
-/// </summary>
-public class ShuffleStateCommand : Command { }
+public class MoveToTopOfQueueCommand : Command { public string TrackIdentifier { get; set; } = string.Empty; }
 
-/// <summary>
-/// Get the queued tracks in the current playlist.
-/// </summary>
-public class QueuedTracksCommand : Command { }
+public class AddRecommendationCommand : PlayTrackCommand { public string BtnId { get; set; } = string.Empty; }

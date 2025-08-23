@@ -20,13 +20,16 @@ public interface IMusicService
     IEnumerable<ICommand> GetCommands(string playerId);
     void AddCommand(string playerId, ICommand command);
 
+    Track[] GetRecommendations(string playerId);
+
     Task PlayAsync(PlayTrackCommand command);
     Task StopAsync(StopTrackCommand command);
     Task SkipAsync(SkipTrackCommand command);
     Task PauseAsync(PauseTrackCommand command);
     Task ResumeAsync(ResumeTrackCommand command);
     Task SetShuffleAsync(ShuffleTracksCommand command);
-    Task<bool> GetShuffleState(ShuffleStateCommand command);
+    Task MoveToTopOfQueueAsync(MoveToTopOfQueueCommand command);
+    Task AddRecommendationAsync(AddRecommendationCommand command);    
 
     Task NotifyPlayerTracked(string id);
     Task NotifyStateChanged(string id, PlayerState state);

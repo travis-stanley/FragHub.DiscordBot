@@ -15,7 +15,9 @@ public class MusicCommandHandler(IMusicService _musicService) :
     ICommandHandler<SkipTrackCommand>,
     ICommandHandler<PauseTrackCommand>,
     ICommandHandler<ResumeTrackCommand>,
-    ICommandHandler<ShuffleTracksCommand>
+    ICommandHandler<ShuffleTracksCommand>,
+    ICommandHandler<MoveToTopOfQueueCommand>,
+    ICommandHandler<AddRecommendationCommand>
 {
 
     public async Task HandleAsync(PlayTrackCommand command)
@@ -52,5 +54,17 @@ public class MusicCommandHandler(IMusicService _musicService) :
     {
         ArgumentNullException.ThrowIfNull(command, nameof(command));
         await _musicService.SetShuffleAsync(command).ConfigureAwait(false);
+    }
+
+    public async Task HandleAsync(MoveToTopOfQueueCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command, nameof(command));
+        await _musicService.MoveToTopOfQueueAsync(command).ConfigureAwait(false);
+    }
+
+    public async Task HandleAsync(AddRecommendationCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command, nameof(command));
+        await _musicService.AddRecommendationAsync(command).ConfigureAwait(false);
     }
 }

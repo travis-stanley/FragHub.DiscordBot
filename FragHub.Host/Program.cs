@@ -24,6 +24,8 @@ builder.Services.AddLogging(x => x.AddConsole().SetMinimumLevel(LogLevel.Informa
 builder.Services.AddVariableService();
 builder.Services.AddCommandServices();
 
+builder.Services.AddRecommendationServices();
+
 builder.Services.AddLavalinkServices();
 
 builder.Services.AddMusicServices();
