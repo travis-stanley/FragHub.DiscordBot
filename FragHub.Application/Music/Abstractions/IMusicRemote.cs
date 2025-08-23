@@ -49,5 +49,7 @@ namespace FragHub.Application.Music.Abstractions
         /// <param name="state"></param>
         /// <returns></returns>
         Task OnStateChanged(PlayerState state);
+
+        Task OnRecommendationHandled(string? interactionId); 
     }
 }

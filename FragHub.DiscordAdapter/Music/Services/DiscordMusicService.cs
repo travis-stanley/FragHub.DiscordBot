@@ -72,7 +72,13 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         var remotes = GetRemotes<DiscordMusicRemote>(id);
         foreach (var remote in remotes) { await remote.OnInteractionHandled(); }
     }
+    public async Task NotifyRecommendationHandled(string id, string interactionId)
+    {
+        _logger.LogInformation("Recommendation handled: {PlayerId}", id);
 
+        var remotes = GetRemotes<DiscordMusicRemote>(id);
+        foreach (var remote in remotes) { await remote.OnRecommendationHandled(interactionId); }
+    }
     #endregion
 
 
@@ -102,6 +108,12 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
     }
 
     public Queue<Track> GetQueuedTracks(string playerId) => _queuedTracks.TryGetValue(playerId, out Queue<Track>? value) ? value : [];
+    private void SetQueuedTracks(string playerId, Queue<Track> tracks)
+    {
+        ArgumentNullException.ThrowIfNull(tracks, nameof(tracks));
+        if (!_queuedTracks.TryGetValue(playerId, out Queue<Track>? value)) { value = []; _queuedTracks[playerId] = value; }
+        _queuedTracks[playerId] = tracks;
+    }
 
     private void EnqueueTrack(string playerId, Track track)
     {
@@ -264,17 +276,17 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
                 if (other.Identifier == command.TrackIdentifier) { continue; }
                 newQueue.Enqueue(other);
             }
-            playerQueue = newQueue;
+            SetQueuedTracks(command.GuildId.ToString(), newQueue);
         }
         await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
     }
 
     public async Task AddRecommendationAsync(AddRecommendationCommand command)
     {
-        var playCmd = new PlayTrackCommand() { GuildId = command.GuildId, UserId = command.UserId, VoiceChannelId = command.VoiceChannelId, TextChannelId = command.TextChannelId, SourceType = command.SourceType, Query = command.Query };
-        await PlayAsync(playCmd).ConfigureAwait(false);
+        var playCmd = new PlayTrackCommand() { GuildId = command.GuildId, UserId = command.UserId, VoiceChannelId = command.VoiceChannelId, TextChannelId = command.TextChannelId, SourceType = command.SourceType, Query = command.Query };        
+        await NotifyRecommendationHandled(command.GuildId.ToString(), command.BtnId).ConfigureAwait(false);
 
-        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+        await PlayAsync(playCmd).ConfigureAwait(false);
     }
 
     #endregion

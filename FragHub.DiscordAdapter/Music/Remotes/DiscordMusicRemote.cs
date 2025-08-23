@@ -9,6 +9,7 @@ using FragHub.Domain.Env;
 using FragHub.Domain.Music.Entities;
 using Lavalink4NET.Clients;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
 
 namespace FragHub.DiscordAdapter.Music.Remotes;
 
@@ -69,7 +70,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     }
 
     public async Task OnInteractionHandled()
-    {
+    {        
         await RefreshRemoteButtons().ConfigureAwait(false);
     }
 
@@ -79,6 +80,11 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         {
             await RefreshRemote(true).ConfigureAwait(false);            
         }
+    }
+    public async Task OnRecommendationHandled(string? interactionId)
+    {
+        if (interactionId is not null) { _reactedComponents.Add(interactionId); }
+        await OnInteractionHandled();
     }
 
     public Task OnPlayerTracked()
@@ -115,6 +121,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
             }
         }
         _embedMessageIds.Clear();
+        _reactedComponents.Clear();
     }
 
     /// <summary>
@@ -151,7 +158,6 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         _logger.LogInformation("Player embed sent to text channel {TextChannelId} with message ID {MessageId}.", textChannel.Id, msg.Id);
 
         _embedMessageIds.Add(msg.Id);
-        _reactedComponents.Clear();
     }
 
     /// <summary>

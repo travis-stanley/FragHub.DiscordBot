@@ -131,7 +131,7 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
 
         await FollowupAsync($"Track stopped").ConfigureAwait(false);
     }
-    [ComponentInteraction("PlayerStop")]
+    [ComponentInteraction("PlayerStop", ignoreGroupNames: true)]
     public async Task BtnPlayerStop()
     {
         await Stop().ConfigureAwait(false);
@@ -158,7 +158,7 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
 
         await FollowupAsync($"Track skipped").ConfigureAwait(false);
     }
-    [ComponentInteraction("PlayerSkip")]
+    [ComponentInteraction("PlayerSkip", ignoreGroupNames:true)]
     public async Task BtnPlayerSkip()
     {
         await Skip().ConfigureAwait(false);
@@ -231,18 +231,18 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
         var state = cmd.Enabled ? "enabled" : "disabled";
         await FollowupAsync($"Shuffed {state}").ConfigureAwait(false);
     }
-    [ComponentInteraction("PlayerShuffleOn")]
+    [ComponentInteraction("PlayerShuffleOn", ignoreGroupNames: true)]
     public async Task BtnPlayerShuffleOn()
     {
         await Shuffle(OnOffCL.On);
     }
-    [ComponentInteraction("PlayerShuffleOff")]
+    [ComponentInteraction("PlayerShuffleOff", ignoreGroupNames: true)]
     public async Task BtnPlayerShuffleOff()
     {
         await Shuffle(OnOffCL.Off);
     }
 
-    [ComponentInteraction("PlayerQueue")]
+    [ComponentInteraction("PlayerQueue", ignoreGroupNames: true)]
     public async Task BtnPlayerMoveToTopOfQueue(string trackIdentifier)
     {
         await DeferAsync().ConfigureAwait(false);
@@ -259,27 +259,27 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
 
         await FollowupAsync($"Track moved to top of queue, by {Context.User.Mention}").ConfigureAwait(false);
     }
-    [ComponentInteraction("PlayerAddRec1Btn")]
+    [ComponentInteraction("PlayerAddRec1Btn", ignoreGroupNames: true)]
     public async Task BtnPlayerAddRec1()
     {
         await AddRecommendation(1);
     }
-    [ComponentInteraction("PlayerAddRec2Btn")]
+    [ComponentInteraction("PlayerAddRec2Btn", ignoreGroupNames: true)]
     public async Task BtnPlayerAddRec2()
     {
         await AddRecommendation(2);
     }
-    [ComponentInteraction("PlayerAddRec3Btn")]
+    [ComponentInteraction("PlayerAddRec3Btn", ignoreGroupNames: true)]
     public async Task BtnPlayerAddRec3()
     {
         await AddRecommendation(3);
     }
-    [ComponentInteraction("PlayerAddRec4Btn")]
+    [ComponentInteraction("PlayerAddRec4Btn", ignoreGroupNames: true)]
     public async Task BtnPlayerAddRec4()
     {
         await AddRecommendation(4);
     }
-    [ComponentInteraction("PlayerAddRec5Btn")]
+    [ComponentInteraction("PlayerAddRec5Btn", ignoreGroupNames: true)]
     public async Task BtnPlayerAddRec5()
     {
         await AddRecommendation(5);
@@ -299,18 +299,15 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
         if (recommendedTracks is null) { return; }
 
         if (option < 1 || option > 5) { return; }
-        if (recommendedTracks.Count() < 5 && option == 5) { return; }
-        if (recommendedTracks.Count() < 4 && option == 4) { return; }
-        if (recommendedTracks.Count() < 3 && option == 3) { return; }
-        if (recommendedTracks.Count() < 2 && option == 2) { return; }
-        if (recommendedTracks.Any() && option == 1) { return; }
-        Track recommendedTrack = recommendedTracks.ToArray()[option - 1];
+        if (recommendedTracks.Count() < option) { return; }
+        
+        Track recommendedTrack = recommendedTracks.ElementAt(option - 1);
 
-        if (recommendedTrack is null || recommendedTrack.Uri is null) { return; }
+        if (recommendedTrack is null) { return; }
 
         var cmd = GetCommand<AddRecommendationCommand>(Context, voiceState);
         cmd.BtnId = $"PlayerAddRec{option}Btn";
-        cmd.Query = recommendedTrack.Uri.ToString();
+        cmd.Query = $"{recommendedTrack.Author} {recommendedTrack.Title}";
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
     }
 
