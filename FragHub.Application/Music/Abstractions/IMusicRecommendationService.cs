@@ -9,6 +9,6 @@ namespace FragHub.Application.Music.Abstractions
 {
     public interface IMusicRecommendationService
     {
-        Task<IEnumerable<Track>> GetRecommendations(int limit, Track seed);
+        Task<IEnumerable<Track>> GetRecommendations(int limit, Track seed, Track[]? tracksToOmit);
     }
 }

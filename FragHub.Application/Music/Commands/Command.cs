@@ -17,5 +17,8 @@ namespace FragHub.Application.Music.Commands
         public ulong? UserId { get; set; }
         public ulong? TextChannelId { get; set; }
         public ulong? VoiceChannelId { get; set; }
+
+        public string Description { get; set; } = string.Empty;
+        public List<string> DebugDetails { get; set; } = [];
     }
 }

@@ -275,6 +275,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         msgComponent.AddRow(GetPlayerControls());
         msgComponent.AddRow(GetQueueMenu());
         AddRecommendationActions(msgComponent);
+        //AddHistoryRow(msgComponent);
 
         return msgComponent.Build();
     }
@@ -319,19 +320,19 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
             for (int x = 0; x < queuedTracks.Length; x++)
             {
                 var customTrack = queuedTracks[x];
-                var requestedBy = $"<@{customTrack.RequestedUserId}>";
+                if (customTrack is null) { continue; }
+
+                string requestedBy = "Unknown";
+                if (customTrack.RequestedUserId.HasValue) { requestedBy = $"<@{customTrack.RequestedUserId.Value}>"; }
+                if (customTrack?.SourceType == SourceType.RecommendedByLastfm) { requestedBy = "Lastfm"; }
+
                 var trackName = customTrack?.Title ?? "Unknown Track";
                 var artistName = customTrack?.Author ?? "Unknown Artist";
 
-                if (customTrack?.SourceType == SourceType.RecommendedByLastfm) { requestedBy = "Lastfm"; }
-
                 var label = $"{trackName} - {artistName}";
                 if (label.Length > 80) { label = label[..80]; }
-
-                if (x == 0)
-                    queueMenu.AddOption(label, queuedTracks[x].Identifier, $"Queue position {x + 1} ({requestedBy})", isDefault: true);
-                else
-                    queueMenu.AddOption(label, queuedTracks[x].Identifier, $"Queue position {x + 1} ({requestedBy})");
+                
+                queueMenu.AddOption(label, queuedTracks[x].Identifier, $"Queue position {x + 1} ({requestedBy})", isDefault: x == 0);
             }
         }
         else
@@ -360,17 +361,43 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
 
         var recRecRow = new ActionRowBuilder();
         for (int x = 0; x < nextRecommended.Take(5).ToList().Count; x++)
-        {
-            var label = $"{nextRecommended[x].Title} - {nextRecommended[x].Author}";
+        {            
             var customId = $"PlayerAddRec{x + 1}Btn";
             var disabled = _reactedComponents.Contains(customId);
             var emoteToUse = _reactedComponents.Contains(customId) ? addedEmoji : addEmoji;
 
+            var label = $"{nextRecommended[x].Title} - {nextRecommended[x].Author}";
             if (label.Length > 80) { label = label[..80]; }
 
             recRecRow.WithButton(label, customId, ButtonStyle.Secondary, emoteToUse, disabled: disabled);
         }
         componentBuilder.AddRow(recRecRow);
+    }
+
+    private void AddHistoryRow(ComponentBuilder componentBuilder)
+    {
+        var commandHistoryMenu = new SelectMenuBuilder().WithCustomId("HistoryMenu").WithMinValues(1).WithMaxValues(1);
+
+        var commands = _musicService.GetCommands(guildId).Reverse().Take(5).ToArray();
+
+        for (int x = 0; x < commands.Length; x++)
+        {
+            var command = commands[x];
+            if (command is null) { continue; }
+
+            var commandType = command.GetType().Name;
+            var user = command.UserId.HasValue ? $"<@{command.UserId.Value}>" : "Bot";
+
+            var label = $"{commandType}";
+            if (label.Length > 80) { label = label[..80]; }
+
+            var desc = $"{user} executed";
+
+            commandHistoryMenu.AddOption(label, Guid.NewGuid().ToString(), desc, isDefault: x == 0);
+        }
+
+        var actionRow = new ActionRowBuilder().WithSelectMenu(commandHistoryMenu);
+        componentBuilder.AddRow(actionRow);
     }
 
     #endregion

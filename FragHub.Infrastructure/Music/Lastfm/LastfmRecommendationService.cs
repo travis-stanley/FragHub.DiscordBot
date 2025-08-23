@@ -13,9 +13,10 @@ namespace FragHub.Infrastructure.Music.Lastfm
 {
     public class LastfmRecommendationService(ILogger<LastfmRecommendationService> _logger, IVariableService _variableService) : IMusicRecommendationService
     {
-        public async Task<IEnumerable<Domain.Music.Entities.Track>> GetRecommendations(int limit, Domain.Music.Entities.Track seed)
+        public async Task<IEnumerable<Domain.Music.Entities.Track>> GetRecommendations(int limit, Domain.Music.Entities.Track seed, Domain.Music.Entities.Track[]? tracksToOmit)
         {
-            return await GetSimilar(seed.Author, seed.Title, limit);
+            var titlesToOmit = tracksToOmit?.Select(t => t.Title is not null ? t.Title.ToUpper() : "Unknown").ToArray();
+            return await GetSimilar(seed.Author, seed.Title, limit, titlesToOmit ?? []);
         }
 
 
@@ -29,10 +30,8 @@ namespace FragHub.Infrastructure.Music.Lastfm
         /// <returns></returns>
         /// <remarks>
         /// The returned data is returned by descending play counts so the results are fairly constant.
-        /// TODO: remove tracks that have been previously played in this session
-        /// TODO: only include x tracks from the same artist
         /// </remarks>
-        private async Task<IEnumerable<Domain.Music.Entities.Track>> GetSimilar(string artist, string? track, int limit)
+        private async Task<IEnumerable<Domain.Music.Entities.Track>> GetSimilar(string artist, string? track, int limit, string[] titlesToOmit)
         {
             _logger.LogInformation($"Getting similar tracks for {track} by {artist}");
             var lastfmKey = _variableService.GetVariable(LastfmConfig.ApiToken) ?? string.Empty;
@@ -58,7 +57,9 @@ namespace FragHub.Infrastructure.Music.Lastfm
             var jsonResponse = await response.Content.ReadAsStringAsync();
             var similarTracks = JsonConvert.DeserializeObject<GetSimilarResponse>(jsonResponse);
 
-            var randomizeTracks = similarTracks?.SimilarTracks?.Tracks?.Take(10).OrderBy(o => Guid.NewGuid()).Take(limit);
+            var results = similarTracks?.SimilarTracks?.Tracks?.Where(st => st.TrackName is not null && !titlesToOmit.Contains(st.TrackName.ToUpper()));
+
+            var randomizeTracks = similarTracks?.SimilarTracks?.Tracks?.Take(20).OrderBy(o => Guid.NewGuid()).Take(limit);
             if (randomizeTracks == null) { return []; }
 
             return randomizeTracks.Select(t => new Domain.Music.Entities.Track() { Author = t.Artist?.Name ?? "", Title = t.TrackName });

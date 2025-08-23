@@ -100,8 +100,9 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
 
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
 
-        var track = _musicService.GetQueuedTracks(Context.Guild.Id.ToString()).LastOrDefault();
-        if (track is null || track.Uri is null)
+        var track = _musicService.GetQueuedTracks(Context.Guild.Id.ToString()).LastOrDefault() ?? _musicService.GetTracks(Context.Guild.Id.ToString()).LastOrDefault();
+
+        if (track is null)
         {
             await FollowupAsync($"No track found for query: {song_artist_url_etc}").ConfigureAwait(false);
             return;
@@ -299,7 +300,7 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
         if (recommendedTracks is null) { return; }
 
         if (option < 1 || option > 5) { return; }
-        if (recommendedTracks.Count() < option) { return; }
+        if (recommendedTracks.Length < option) { return; }
         
         Track recommendedTrack = recommendedTracks.ElementAt(option - 1);
 

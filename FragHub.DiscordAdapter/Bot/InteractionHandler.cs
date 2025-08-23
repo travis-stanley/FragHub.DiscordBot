@@ -55,7 +55,7 @@ public class InteractionHandler(ILogger<InteractionHandler> _logger, DiscordSock
 
     private async Task LoadModules()
     {
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location)).ToArray();
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location) && a.FullName!.Contains("FragHub", StringComparison.CurrentCultureIgnoreCase)).ToArray();
         
         var modules = new List<ModuleInfo>();
         foreach (var assembly in assemblies)

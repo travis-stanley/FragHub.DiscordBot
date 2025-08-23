@@ -137,7 +137,12 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
     private async Task RefreshRecommendations(string playerId, Track? playingTrack)
     {
         if (playingTrack == null) { return; }
-        var tracks = await _musicRecommendationService.GetRecommendations(5, playingTrack).ConfigureAwait(false);
+        
+        var tracksToOmit = new List<Track>();
+        if (GetTracks(playerId) is { } playedTracks) { tracksToOmit.AddRange(playedTracks); }
+        if (GetQueuedTracks(playerId) is { } queuedTracks) { tracksToOmit.AddRange(queuedTracks); }
+
+        var tracks = await _musicRecommendationService.GetRecommendations(5, playingTrack, [.. tracksToOmit]).ConfigureAwait(false);
 
         if (tracks == null) { return; }
         SetRecommendations(playerId, [.. tracks]);
@@ -277,7 +282,10 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
                 newQueue.Enqueue(other);
             }
             SetQueuedTracks(command.GuildId.ToString(), newQueue);
-        }
+
+            await player.MoveToTopOfQueue(command, track);
+        }        
+
         await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
     }
 

@@ -20,5 +20,7 @@ public interface IMusicPlayer
     Task SkipAsync(ICommand command);
     Task PauseAsync(ICommand command);
     Task ResumeAsync(ICommand command);    
-    void SetShuffle(ICommand command, bool enabled);     
+    void SetShuffle(ICommand command, bool enabled);
+
+    Task MoveToTopOfQueue(ICommand command, Track queuedTrack);
 }
