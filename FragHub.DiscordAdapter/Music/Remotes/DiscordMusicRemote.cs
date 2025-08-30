@@ -14,7 +14,7 @@ using Microsoft.VisualBasic;
 namespace FragHub.DiscordAdapter.Music.Remotes;
 
 
-public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicService _musicService, IPlayerSettings _playerSettings, DiscordSocketClient _discordClient, string guildId, string textChannelName) : IMusicRemote
+public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicService _musicService, IPlayerSettings _playerSettings, DiscordSocketClient _discordClient, string guildId, string voiceChannelId, string textChannelName) : IMusicRemote
 {    
     private List<string> _reactedComponents = [];
     private List<ulong> _embedMessageIds = [];
@@ -139,7 +139,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
             return;
         }
 
-        var msgComponents = GetPlayerComponents();
+        var msgComponents = await GetPlayerComponents();
         if (msgComponents is null)
         {
             _logger.LogError("Could not build player components.");
@@ -170,7 +170,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         {
             var lastEmbedMessageId = _embedMessageIds.Last();
 
-            var msgComponents = GetPlayerComponents();
+            var msgComponents = await GetPlayerComponents();
             if (msgComponents != null)
             {
                 var _textChannel = GetTextChannelForPlayer();
@@ -269,13 +269,38 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     /// Gets the player components for the music player embed.
     /// </summary>
     /// <returns></returns>
-    private MessageComponent? GetPlayerComponents()
+    private async Task<MessageComponent?> GetPlayerComponents()
     {
         var msgComponent = new ComponentBuilder();
         msgComponent.AddRow(GetPlayerControls());
-        msgComponent.AddRow(GetQueueMenu());
-        AddRecommendationActions(msgComponent);
-        //AddHistoryRow(msgComponent);
+
+        var queuedItems = AddQueueMenu(msgComponent);
+
+        // if queue is empty, send add recommendation cmd using one of the 5 recommendations
+        if (queuedItems is not null && queuedItems.Length == 0)
+        {
+            var recommendations = AddRecommendationActions(msgComponent);
+            if (recommendations != null)
+            {
+                var next = recommendations.Where(t => t.Title is not null && t.Author is not null).OrderBy(t => Guid.NewGuid()).FirstOrDefault();
+                var nextBtnId = Array.IndexOf(recommendations, next) + 1;
+
+                if (next != null)
+                {
+                    var cmd = new AddRecommendationCommand()
+                    {
+                        GuildId = ulong.Parse(guildId),
+                        UserId = null,
+                        VoiceChannelId = ulong.Parse(voiceChannelId),
+                        TextChannelId = GetTextChannelForPlayer()?.Id,
+                        Query = $"{next.Author} {next.Title}",
+                        SourceType = SourceType.RecommendedByLastfm,
+                        BtnId = $"PlayerAddRec{nextBtnId}Btn"
+                    };
+                    await _musicService.AddRecommendationAsync(cmd);
+                }
+            }
+        }        
 
         return msgComponent.Build();
     }
@@ -306,7 +331,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     /// Builds the queue menu for the player.
     /// </summary>
     /// <returns></returns>
-    private ActionRowBuilder GetQueueMenu()
+    private Track[]? AddQueueMenu(ComponentBuilder componentBuilder)
     {
         var queuedTracks = _musicService.GetQueuedTracks(guildId).ToArray();
 
@@ -341,14 +366,17 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         }
 
         var playerQueueRow = new ActionRowBuilder().WithSelectMenu(queueMenu);
-        return playerQueueRow;
+        componentBuilder.AddRow(playerQueueRow);
+
+        return queuedTracks;
     }
 
     /// <summary>
     /// Builds the recommendation actions for the player.
     /// </summary>
     /// <param name="componentBuilder"></param>
-    private void AddRecommendationActions(ComponentBuilder componentBuilder)
+    /// <returns>Recommendataions</returns>
+    private Track[]? AddRecommendationActions(ComponentBuilder componentBuilder)
     {
         var recActionRow = new ActionRowBuilder();
         recActionRow.WithButton("Lastfm Recommendations", "PlayerRecLabelBtn", ButtonStyle.Success, new Emoji("\U0001F4FB"), disabled: true);
@@ -372,32 +400,8 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
             recRecRow.WithButton(label, customId, ButtonStyle.Secondary, emoteToUse, disabled: disabled);
         }
         componentBuilder.AddRow(recRecRow);
-    }
 
-    private void AddHistoryRow(ComponentBuilder componentBuilder)
-    {
-        var commandHistoryMenu = new SelectMenuBuilder().WithCustomId("HistoryMenu").WithMinValues(1).WithMaxValues(1);
-
-        var commands = _musicService.GetCommands(guildId).Reverse().Take(5).ToArray();
-
-        for (int x = 0; x < commands.Length; x++)
-        {
-            var command = commands[x];
-            if (command is null) { continue; }
-
-            var commandType = command.GetType().Name;
-            var user = command.UserId.HasValue ? $"<@{command.UserId.Value}>" : "Bot";
-
-            var label = $"{commandType}";
-            if (label.Length > 80) { label = label[..80]; }
-
-            var desc = $"{user} executed";
-
-            commandHistoryMenu.AddOption(label, Guid.NewGuid().ToString(), desc, isDefault: x == 0);
-        }
-
-        var actionRow = new ActionRowBuilder().WithSelectMenu(commandHistoryMenu);
-        componentBuilder.AddRow(actionRow);
+        return nextRecommended;
     }
 
     #endregion

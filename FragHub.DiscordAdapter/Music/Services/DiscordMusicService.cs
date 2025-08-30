@@ -139,15 +139,15 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (playingTrack == null) { return; }
         
         var tracksToOmit = new List<Track>();
+        var queuedTracks = GetQueuedTracks(playerId);        
+        if (queuedTracks.Count > 0) { tracksToOmit.AddRange(queuedTracks); }
         if (GetTracks(playerId) is { } playedTracks) { tracksToOmit.AddRange(playedTracks); }
-        if (GetQueuedTracks(playerId) is { } queuedTracks) { tracksToOmit.AddRange(queuedTracks); }
 
         var tracks = await _musicRecommendationService.GetRecommendations(5, playingTrack, [.. tracksToOmit]).ConfigureAwait(false);
 
         if (tracks == null) { return; }
-        SetRecommendations(playerId, [.. tracks]);
-    }
-
+        SetRecommendations(playerId, [.. tracks.Take(5)]);           
+    }        
     #endregion
 
 
@@ -337,7 +337,7 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (remotes == null || !remotes.Any())
         {
             var botTextChannelName = _variableService.GetVariable(Config.DiscordConfig.TextChannelName) ?? string.Empty;
-            var remote = new DiscordMusicRemote(_logger, this, new LavalinkPlayerSettings(), _discordClient, guildId.ToString(), botTextChannelName);
+            var remote = new DiscordMusicRemote(_logger, this, new LavalinkPlayerSettings(), _discordClient, guildId.ToString(), voiceChannelId.ToString(), botTextChannelName);
             remotes = AddRemote(guildId.ToString(), remote);
         }
 

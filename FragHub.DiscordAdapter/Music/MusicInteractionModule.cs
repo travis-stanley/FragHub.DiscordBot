@@ -165,49 +165,49 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
         await Skip().ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Register a command to pause the current track.
-    /// </summary>
-    /// <returns></returns>
-    [SlashCommand("pause", description: "Pause playing the current track", runMode: RunMode.Async)]
-    public async Task Pause()
-    {
-        // follow up calls are tied to first, thus follow ephemeral of first
-        await DeferAsync(ephemeral: true).ConfigureAwait(false);
+    ///// <summary>
+    ///// Register a command to pause the current track.
+    ///// </summary>
+    ///// <returns></returns>
+    //[SlashCommand("pause", description: "Pause playing the current track", runMode: RunMode.Async)]
+    //public async Task Pause()
+    //{
+    //    // follow up calls are tied to first, thus follow ephemeral of first
+    //    await DeferAsync(ephemeral: true).ConfigureAwait(false);
 
-        _logger.LogInformation("Received pause command: from {User}", Context.User.Username);
+    //    _logger.LogInformation("Received pause command: from {User}", Context.User.Username);
 
-        // check if user is in a voice channel
-        var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
-        if (voiceState == null) { return; }
+    //    // check if user is in a voice channel
+    //    var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
+    //    if (voiceState == null) { return; }
 
-        var cmd = GetCommand<PauseTrackCommand>(Context, voiceState);
-        await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
+    //    var cmd = GetCommand<PauseTrackCommand>(Context, voiceState);
+    //    await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
 
-        await FollowupAsync($"Track paused").ConfigureAwait(false);
-    }
+    //    await FollowupAsync($"Track paused").ConfigureAwait(false);
+    //}
 
-    /// <summary>
-    /// Register a command to resume the current track.
-    /// </summary>
-    /// <returns></returns>
-    [SlashCommand("resume", description: "Resume playing the current track", runMode: RunMode.Async)]
-    public async Task Resume()
-    {
-        // follow up calls are tied to first, thus follow ephemeral of first
-        await DeferAsync(ephemeral: true).ConfigureAwait(false);
+    ///// <summary>
+    ///// Register a command to resume the current track.
+    ///// </summary>
+    ///// <returns></returns>
+    //[SlashCommand("resume", description: "Resume playing the current track", runMode: RunMode.Async)]
+    //public async Task Resume()
+    //{
+    //    // follow up calls are tied to first, thus follow ephemeral of first
+    //    await DeferAsync(ephemeral: true).ConfigureAwait(false);
 
-        _logger.LogInformation("Received resume command: from {User}", Context.User.Username);
+    //    _logger.LogInformation("Received resume command: from {User}", Context.User.Username);
 
-        // check if user is in a voice channel
-        var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
-        if (voiceState == null) { return; }
+    //    // check if user is in a voice channel
+    //    var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
+    //    if (voiceState == null) { return; }
 
-        var cmd = GetCommand<ResumeTrackCommand>(Context, voiceState);
-        await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
+    //    var cmd = GetCommand<ResumeTrackCommand>(Context, voiceState);
+    //    await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
 
-        await FollowupAsync($"Track resuming").ConfigureAwait(false);
-    }
+    //    await FollowupAsync($"Track resuming").ConfigureAwait(false);
+    //}
 
     /// <summary>
     /// Register a command to enable shuffling the playlist.
