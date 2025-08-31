@@ -13,6 +13,7 @@ public enum PlayerState
     Active,
     Stopped,
     Playing,
+    Skipped,
     Paused,
     Inactive
 }

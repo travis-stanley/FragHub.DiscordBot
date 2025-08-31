@@ -17,6 +17,8 @@ public interface IMusicService
     Track[] GetTracks(string playerId);
     Queue<Track> GetQueuedTracks(string playerId);
 
+    ulong GetBotUserId();
+
     IEnumerable<ICommand> GetCommands(string playerId);
     void AddCommand(string playerId, ICommand command);
 

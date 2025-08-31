@@ -32,7 +32,7 @@ public class Track
 
     public ulong GuildId { get; init; }
     public ulong VoiceChannelId { get; init; }
-    public ulong? RequestedUserId { get; init; }    // may be null if the track was not requested by a user (e.g., recommended track)
+    public ulong? RequestedUserId { get; init; } 
     public SourceType SourceType { get; init; }
 
     public bool WasSkipped { get; set; }

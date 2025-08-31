@@ -16,6 +16,8 @@ namespace FragHub.Application.Music.Abstractions
     public interface IMusicRemote
     {
         string GuildId { get; }
+        string TextChannelId { get; }
+        string VoiceChannelId { get; }
 
         IPlayerSettings PlayerSettings { get; set; }
 

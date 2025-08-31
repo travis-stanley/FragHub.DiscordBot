@@ -12,6 +12,7 @@ using Lavalink4NET.Players;
 using Lavalink4NET.Rest.Entities.Tracks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace FragHub.DiscordAdapter.Music.Services;
 
@@ -51,8 +52,12 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
     public async Task NotifyStateChanged(string id, Application.Music.Abstractions.PlayerState state)
     {
         _logger.LogInformation("Player state changed: {PlayerId}, State: {State}", id, state);
+
+        if (state == Application.Music.Abstractions.PlayerState.Stopped)
+            _queuedTracks.Clear();
+
         var remotes = GetRemotes<DiscordMusicRemote>(id);
-        foreach (var remote in remotes) { await remote.OnStateChanged(state); remote.PlayerSettings.PlayerState = state; }
+        foreach (var remote in remotes) { await remote.OnStateChanged(state); remote.PlayerSettings.PlayerState = state; }        
     }
     public async Task NotifyTrackStarted(string id)
     {
@@ -64,6 +69,12 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
 
         var remotes = GetRemotes<DiscordMusicRemote>(id);
         foreach (var remote in remotes) { await remote.OnTrackStarted(); remote.PlayerSettings.PlayerState = Application.Music.Abstractions.PlayerState.Playing; }
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(30));
+            await PlayNextRecommendation(id);
+        });
     }
     public async Task NotifyInteractionHandled(string id)
     {
@@ -81,6 +92,11 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
     }
     #endregion
 
+    #region User Management
+
+    public ulong GetBotUserId() => _discordClient.CurrentUser.Id;
+
+    #endregion
 
     #region Command Management
 
@@ -148,6 +164,37 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (tracks == null) { return; }
         SetRecommendations(playerId, [.. tracks.Take(5)]);           
     }        
+
+    private async Task PlayNextRecommendation(string playerId)
+    {
+        var player = await _audioService.Players.GetPlayerAsync(ulong.Parse(playerId));
+        if (player == null) { return; }
+        if (player.State != Lavalink4NET.Players.PlayerState.Playing) { return; }
+
+        var queuedTracks = GetQueuedTracks(playerId);
+        if (queuedTracks.Count > 0) { return; }
+
+        var remote = GetRemotes<DiscordMusicRemote>(playerId).FirstOrDefault();
+        if (remote == null) { return; }
+
+        var recommendations = GetRecommendations(playerId);
+        var next = recommendations.Where(t => t.Title is not null && t.Author is not null).OrderBy(t => Guid.NewGuid()).FirstOrDefault();
+        if (next  == null) { return; }
+
+        var nextBtnId = Array.IndexOf(recommendations, next) + 1;
+
+        var cmd = new AddRecommendationCommand()
+        {
+            GuildId = ulong.Parse(playerId),
+            UserId = GetBotUserId(),
+            VoiceChannelId = ulong.Parse(remote.VoiceChannelId),
+            TextChannelId = ulong.Parse(remote.TextChannelId),
+            Query = $"{next.Author} {next.Title}",
+            SourceType = SourceType.RecommendedByLastfm,
+            BtnId = $"PlayerAddRec{nextBtnId}Btn"
+        };
+        await AddRecommendationAsync(cmd);
+    }
     #endregion
 
 
@@ -175,7 +222,7 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         foreach (var remote in remotes) { remote.PlayerSettings.PlayerState = Application.Music.Abstractions.PlayerState.Playing; }
 
         await player.PlayAsync(command, track).ConfigureAwait(false);
-        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);        
     }
 
     public async Task StopAsync(StopTrackCommand command)
@@ -193,7 +240,7 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         foreach (var remote in remotes) { remote.PlayerSettings.PlayerState = Application.Music.Abstractions.PlayerState.Stopped; }
 
         await player.StopAsync(command).ConfigureAwait(false);
-        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+        await NotifyStateChanged(command.GuildId.ToString(), Application.Music.Abstractions.PlayerState.Stopped).ConfigureAwait(false);
     }
 
     public async Task SkipAsync(SkipTrackCommand command)
@@ -203,12 +250,17 @@ public class DiscordMusicService(ILogger<IMusicService> _logger, IAudioService _
         if (!command.UserId.HasValue) { throw new ArgumentNullException(nameof(command.UserId), "UserId must be provided."); }
 
         var currentTrack = GetTracks(command.GuildId.ToString()).LastOrDefault();
-        if (currentTrack != null) { currentTrack.WasPlayed = false; currentTrack.WasSkipped = true; currentTrack.LastInteractedUserId = command.UserId; }
+        if (currentTrack != null) { currentTrack.WasPlayed = false; currentTrack.WasSkipped = true; currentTrack.LastInteractedUserId = command.UserId; }        
+
+        var state = Application.Music.Abstractions.PlayerState.Skipped;
+        var queuedTracks = GetQueuedTracks(command.GuildId.ToString());
+        if (queuedTracks is null || queuedTracks.Count == 0) { state = Application.Music.Abstractions.PlayerState.Stopped; }
 
         var player = await GetPlayerAsync(command.GuildId, command.VoiceChannelId.Value, command.UserId.Value).ConfigureAwait(false) ?? throw new InvalidOperationException($"Failed to retrieve player for GuildId: {command.GuildId}, VoiceChannelId: {command.VoiceChannelId.Value}, UserId: {command.UserId.Value}");
-
         await player.SkipAsync(command).ConfigureAwait(false);
-        await NotifyInteractionHandled(command.GuildId.ToString()).ConfigureAwait(false);
+
+        _logger.LogInformation("Track skipped and state is {state}", state);
+        await NotifyStateChanged(command.GuildId.ToString(), state).ConfigureAwait(false);
     }
 
     public async Task PauseAsync(PauseTrackCommand command)

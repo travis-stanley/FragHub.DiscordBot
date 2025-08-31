@@ -129,8 +129,6 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
 
         var cmd = GetCommand<StopTrackCommand>(Context, voiceState);
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
-
-        await FollowupAsync($"Track stopped").ConfigureAwait(false);
     }
     [ComponentInteraction("PlayerStop", ignoreGroupNames: true)]
     public async Task BtnPlayerStop()
@@ -156,8 +154,6 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
 
         var cmd = GetCommand<SkipTrackCommand>(Context, voiceState);
         await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
-
-        await FollowupAsync($"Track skipped").ConfigureAwait(false);
     }
     [ComponentInteraction("PlayerSkip", ignoreGroupNames:true)]
     public async Task BtnPlayerSkip()
@@ -209,39 +205,38 @@ public sealed class MusicInteractionModule(ILogger<MusicInteractionModule> _logg
     //    await FollowupAsync($"Track resuming").ConfigureAwait(false);
     //}
 
-    /// <summary>
-    /// Register a command to enable shuffling the playlist.
-    /// </summary>
-    /// <returns></returns>
-    [SlashCommand("shuffle", description: "Resume playing the current track", runMode: RunMode.Async)]
-    public async Task Shuffle(OnOffCL shuffle)
-    {
-        // follow up calls are tied to first, thus follow ephemeral of first
-        await DeferAsync(ephemeral: true).ConfigureAwait(false);
+    ///// <summary>
+    ///// Register a command to enable shuffling the playlist.
+    ///// </summary>
+    ///// <returns></returns>
+    //[SlashCommand("shuffle", description: "Resume playing the current track", runMode: RunMode.Async)]
+    //public async Task Shuffle(OnOffCL shuffle)
+    //{
+    //    // follow up calls are tied to first, thus follow ephemeral of first
+    //    await DeferAsync(ephemeral: true).ConfigureAwait(false);
 
-        _logger.LogInformation("Received shuffle command: from {User} - {Enable}", Context.User.Username, shuffle);
+    //    _logger.LogInformation("Received shuffle command: from {User} - {Enable}", Context.User.Username, shuffle);
 
-        // check if user is in a voice channel
-        var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
-        if (voiceState == null) { return; }
+    //    // check if user is in a voice channel
+    //    var voiceState = await IsUserInVoiceAsync(Context).ConfigureAwait(false);
+    //    if (voiceState == null) { return; }
 
-        var cmd = GetCommand<ShuffleTracksCommand>(Context, voiceState);
-        cmd.Enabled = shuffle == OnOffCL.On;
-        await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
+    //    var cmd = GetCommand<ShuffleTracksCommand>(Context, voiceState);
+    //    cmd.Enabled = shuffle == OnOffCL.On;
+    //    await _commandDispatcher.DispatchAsync(cmd).ConfigureAwait(false);
 
-        var state = cmd.Enabled ? "enabled" : "disabled";
-        await FollowupAsync($"Shuffed {state}").ConfigureAwait(false);
-    }
-    [ComponentInteraction("PlayerShuffleOn", ignoreGroupNames: true)]
-    public async Task BtnPlayerShuffleOn()
-    {
-        await Shuffle(OnOffCL.On);
-    }
-    [ComponentInteraction("PlayerShuffleOff", ignoreGroupNames: true)]
-    public async Task BtnPlayerShuffleOff()
-    {
-        await Shuffle(OnOffCL.Off);
-    }
+    //    var state = cmd.Enabled ? "enabled" : "disabled";
+    //}
+    //[ComponentInteraction("PlayerShuffleOn", ignoreGroupNames: true)]
+    //public async Task BtnPlayerShuffleOn()
+    //{
+    //    await Shuffle(OnOffCL.On);
+    //}
+    //[ComponentInteraction("PlayerShuffleOff", ignoreGroupNames: true)]
+    //public async Task BtnPlayerShuffleOff()
+    //{
+    //    await Shuffle(OnOffCL.Off);
+    //}
 
     [ComponentInteraction("PlayerQueue", ignoreGroupNames: true)]
     public async Task BtnPlayerMoveToTopOfQueue(string trackIdentifier)

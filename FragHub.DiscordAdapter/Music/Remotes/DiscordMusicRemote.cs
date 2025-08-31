@@ -23,6 +23,8 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     public IPlayerSettings PlayerSettings { get => _playerSettings; set => _playerSettings = value; }
 
     public string GuildId => guildId;
+    public string VoiceChannelId => voiceChannelId;
+    public string TextChannelId => GetTextChannelForPlayer()!.Id.ToString();
 
     SocketTextChannel? _textChannel;
 
@@ -66,23 +68,25 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     /// <exception cref="NotImplementedException"></exception>
     public async Task OnTrackStarted()
     {
+        _logger.LogInformation("Remote.OnTrackStarted()");
         await RefreshRemote(false).ConfigureAwait(false);
     }
 
     public async Task OnInteractionHandled()
-    {        
+    {
+        _logger.LogInformation("Remote.OnInteractionHandled()");
         await RefreshRemoteButtons().ConfigureAwait(false);
     }
 
     public async Task OnStateChanged(PlayerState state)
     {
-        if (state == PlayerState.Inactive)
-        {
-            await RefreshRemote(true).ConfigureAwait(false);            
-        }
+        _logger.LogInformation("Remote.OnStateChanged()");
+        if (state == PlayerState.Stopped)
+            await RefreshRemote(true).ConfigureAwait(false);
     }
     public async Task OnRecommendationHandled(string? interactionId)
     {
+        _logger.LogInformation("Remote.OnRecommendationHandled()");
         if (interactionId is not null) { _reactedComponents.Add(interactionId); }
         await OnInteractionHandled();
     }
@@ -139,7 +143,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
             return;
         }
 
-        var msgComponents = await GetPlayerComponents();
+        var msgComponents = GetPlayerComponents();
         if (msgComponents is null)
         {
             _logger.LogError("Could not build player components.");
@@ -154,10 +158,12 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         }
 
         // Send the embed to the text channel
+        if (isInactive) msgComponents = null;
+
         var msg = await textChannel.SendMessageAsync(embed: embed, components: msgComponents).ConfigureAwait(false);
         _logger.LogInformation("Player embed sent to text channel {TextChannelId} with message ID {MessageId}.", textChannel.Id, msg.Id);
 
-        _embedMessageIds.Add(msg.Id);
+        if (!isInactive) _embedMessageIds.Add(msg.Id);
     }
 
     /// <summary>
@@ -170,7 +176,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         {
             var lastEmbedMessageId = _embedMessageIds.Last();
 
-            var msgComponents = await GetPlayerComponents();
+            var msgComponents = GetPlayerComponents();
             if (msgComponents != null)
             {
                 var _textChannel = GetTextChannelForPlayer();
@@ -250,14 +256,22 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     /// <returns></returns>
     private Embed? BuildRemoteEmbedNothingPlaying()
     {        
-        var title = $"Nothing to Play";
+        var title = $"Session Ended";
+
+        var tracksToDisplay = 10;
+
+        var tracks = _musicService.GetTracks(guildId).Reverse();
+        var previousTracks = string.Join("\n", tracks.Take(tracksToDisplay).Select(t => $"{t.Title} by {t.Author}"));
+        if (tracks.Count() > tracksToDisplay)
+            previousTracks = $"{previousTracks}\n...plus {tracks.Count() - tracksToDisplay} more";
+        
 
         var embedfieldbuilds = new List<EmbedFieldBuilder>
         {
             new()
             {
-                Name = "Add",
-                Value = $"Use music slash commands to add tracks",
+                Name = "Recent Tracks",
+                Value = previousTracks,
                 IsInline = false
             }
         };
@@ -269,38 +283,13 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
     /// Gets the player components for the music player embed.
     /// </summary>
     /// <returns></returns>
-    private async Task<MessageComponent?> GetPlayerComponents()
+    private MessageComponent? GetPlayerComponents()
     {
         var msgComponent = new ComponentBuilder();
+
         msgComponent.AddRow(GetPlayerControls());
-
         var queuedItems = AddQueueMenu(msgComponent);
-
-        // if queue is empty, send add recommendation cmd using one of the 5 recommendations
-        if (queuedItems is not null && queuedItems.Length == 0)
-        {
-            var recommendations = AddRecommendationActions(msgComponent);
-            if (recommendations != null)
-            {
-                var next = recommendations.Where(t => t.Title is not null && t.Author is not null).OrderBy(t => Guid.NewGuid()).FirstOrDefault();
-                var nextBtnId = Array.IndexOf(recommendations, next) + 1;
-
-                if (next != null)
-                {
-                    var cmd = new AddRecommendationCommand()
-                    {
-                        GuildId = ulong.Parse(guildId),
-                        UserId = null,
-                        VoiceChannelId = ulong.Parse(voiceChannelId),
-                        TextChannelId = GetTextChannelForPlayer()?.Id,
-                        Query = $"{next.Author} {next.Title}",
-                        SourceType = SourceType.RecommendedByLastfm,
-                        BtnId = $"PlayerAddRec{nextBtnId}Btn"
-                    };
-                    await _musicService.AddRecommendationAsync(cmd);
-                }
-            }
-        }        
+        var recommendations = AddRecommendationActions(msgComponent);               
 
         return msgComponent.Build();
     }
@@ -316,10 +305,10 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
         var playerActionRow = new ActionRowBuilder();
         playerActionRow.WithButton("Skip", customId: "PlayerSkip", emote: new Emoji("\u23E9"), disabled: _reactedComponents.Contains("PlayerSkip"));
 
-        if (shuffleState)
-            playerActionRow.WithButton("Standard", "PlayerShuffleOff", ButtonStyle.Primary, emote: new Emoji("\u27A1"), disabled: _reactedComponents.Contains("PlayerShuffleOff"));
-        else
-            playerActionRow.WithButton("Shuffle", "PlayerShuffleOn", ButtonStyle.Primary, emote: new Emoji("\uD83D\uDD00"), disabled: _reactedComponents.Contains("PlayerShuffleOn"));
+        //if (shuffleState)
+        //    playerActionRow.WithButton("Standard", "PlayerShuffleOff", ButtonStyle.Primary, emote: new Emoji("\u27A1"), disabled: _reactedComponents.Contains("PlayerShuffleOff"));
+        //else
+        //    playerActionRow.WithButton("Shuffle", "PlayerShuffleOn", ButtonStyle.Primary, emote: new Emoji("\uD83D\uDD00"), disabled: _reactedComponents.Contains("PlayerShuffleOn"));
 
         playerActionRow.WithButton("Stop", "PlayerStop", ButtonStyle.Danger, emote: new Emoji("\u2716"), disabled: _reactedComponents.Contains("PlayerStop"));
         playerActionRow.WithButton("Next Up", "PlayerQueueBtn", ButtonStyle.Secondary, new Emoji("\u2935"), disabled: true);
@@ -357,7 +346,7 @@ public sealed class DiscordMusicRemote(ILogger<IMusicService> _logger, IMusicSer
                 var label = $"{trackName} - {artistName}";
                 if (label.Length > 80) { label = label[..80]; }
                 
-                queueMenu.AddOption(label, queuedTracks[x].Identifier, $"Queue position {x + 1} ({requestedBy})", isDefault: x == 0);
+                queueMenu.AddOption(label, queuedTracks[x].Identifier, $"Queue position {x + 1}", isDefault: x == 0);
             }
         }
         else
