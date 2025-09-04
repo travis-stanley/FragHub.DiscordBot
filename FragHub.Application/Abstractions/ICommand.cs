@@ -27,6 +27,16 @@ public interface ICommand
     /// Voice Channel ID for the command, if applicable.
     /// </summary>
     ulong? VoiceChannelId { get; set; }
+
+    /// <summary>
+    /// Description of the command.
+    /// </summary>
+    string Description { get; set; }
+
+    /// <summary>
+    /// Debug details
+    /// </summary>
+    List<string> DebugDetails { get; set; }
 }
 
 public interface ICommandHandler<TCommand> where TCommand : ICommand

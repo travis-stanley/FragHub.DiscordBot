@@ -20,10 +20,13 @@ public class VariableService : IVariableService
 {
     private readonly Dictionary<string, Variable> _variables = new(StringComparer.OrdinalIgnoreCase);
 
-    public VariableService(ILogger<IVariableService> logger, params object[] keySources)
+    public VariableService(ILogger<IVariableService> logger, params IEnvConfig?[]? keySources)
     {
+        ArgumentNullException.ThrowIfNull(keySources, nameof(keySources));
+
         foreach (var source in keySources)
         {
+            if (source is null) { continue; }
             foreach (var variable in VariableLoader.LoadAll(source))
             {
                 _variables[variable.Key] = variable;

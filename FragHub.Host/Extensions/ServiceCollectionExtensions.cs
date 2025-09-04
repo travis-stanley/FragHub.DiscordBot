@@ -13,6 +13,7 @@ using FragHub.DiscordAdapter.Users.Services;
 using FragHub.Infrastructure.Config;
 using FragHub.Infrastructure.Data;
 using FragHub.Infrastructure.Env;
+using FragHub.Infrastructure.Music.Lastfm;
 using FragHub.Infrastructure.Repositories;
 using Lavalink4NET.Extensions;
 using Lavalink4NET.InactivityTracking;
@@ -82,9 +83,16 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The <see cref="IServiceCollection"/> to which the service will be added.</param>
     /// <returns>The updated <see cref="IServiceCollection"/> instance.</returns>
     public static IServiceCollection AddVariableService(this IServiceCollection services)
-    {
-        object[] vars = [new LavalinkConfig(), new DiscordConfig(), new InfrastructureConfig()];
-        services.AddSingleton<IVariableService>(sp => new VariableService(sp.GetRequiredService<ILogger<IVariableService>>(), vars));
+    {        
+        var assembliesTypes = Assembly.Load("FragHub.Application").GetTypes().ToList();
+        assembliesTypes.AddRange(Assembly.Load("FragHub.DiscordAdapter").GetTypes());
+        assembliesTypes.AddRange(Assembly.Load("FragHub.Domain").GetTypes());
+        assembliesTypes.AddRange(Assembly.Load("FragHub.Infrastructure").GetTypes());
+
+        var envConfigTypes = assembliesTypes.Where(t => typeof(IEnvConfig).IsAssignableFrom(t) && !t.IsInterface && t.IsClass);
+        var envConfigs = envConfigTypes.Select(t => Activator.CreateInstance(t) as IEnvConfig).ToArray();
+
+        services.AddSingleton<IVariableService>(sp => new VariableService(sp.GetRequiredService<ILogger<IVariableService>>(), envConfigs));
 
         return services;
     }
@@ -133,11 +141,18 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    public static IServiceCollection AddRecommendationServices(this IServiceCollection services)
+    {
+        services.AddSingleton<IMusicRecommendationService, LastfmRecommendationService>();
+
+        return services;
+    }
+
     /// <summary>
     /// Adds music-related services to the specified <see cref="IServiceCollection"/>.
     /// </summary>
     /// <remarks>This method registers the following services as singletons: <list type="bullet">
-    /// <item><description><see cref="IMusicService"/> implemented by <see cref="MusicService"/>.</description></item>
+    /// <item><description><see cref="IMusicService"/> implemented by <see cref="DiscordMusicService"/>.</description></item>
     /// <item><description><see cref="ISearchService"/> implemented by <see cref="SearchService"/>.</description></item>
     /// </list> Use this method to configure music-related functionality in your application's dependency injection
     /// container.</remarks>
@@ -145,7 +160,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The <see cref="IServiceCollection"/> instance with the music services registered.</returns>
     public static IServiceCollection AddMusicServices(this IServiceCollection services)
     {
-        services.AddSingleton<IMusicService, MusicService>();        
+        services.AddSingleton<IMusicService, DiscordMusicService>();        
 
         return services;
     }

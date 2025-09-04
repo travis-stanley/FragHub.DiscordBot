@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 
 var useInMemoryDb = false;
 
@@ -22,6 +23,8 @@ builder.Services.AddLogging(x => x.AddConsole().SetMinimumLevel(LogLevel.Informa
 
 builder.Services.AddVariableService();
 builder.Services.AddCommandServices();
+
+builder.Services.AddRecommendationServices();
 
 builder.Services.AddLavalinkServices();
 

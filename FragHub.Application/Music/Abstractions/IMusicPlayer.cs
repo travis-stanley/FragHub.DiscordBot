@@ -8,8 +8,13 @@ using FragHub.Domain.Music.Entities;
 
 namespace FragHub.Application.Music.Abstractions;
 
+/// <summary>
+/// Defines the contract for a music player capable of handling playback commands and managing a queue of tracks.
+/// </summary>
 public interface IMusicPlayer
 {
+    string GuildId { get; }
+
     Task<int> PlayAsync(ICommand command, Track track);    
     Task StopAsync(ICommand command);
     Task SkipAsync(ICommand command);
@@ -17,5 +22,5 @@ public interface IMusicPlayer
     Task ResumeAsync(ICommand command);    
     void SetShuffle(ICommand command, bool enabled);
 
-    IEnumerable<ICommand> GetCommands();
+    Task MoveToTopOfQueue(ICommand command, Track queuedTrack);
 }

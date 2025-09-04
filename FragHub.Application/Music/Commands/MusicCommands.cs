@@ -12,7 +12,11 @@ namespace FragHub.Application.Music.Commands;
 /// <summary>
 /// Play a track based on a query string.
 /// </summary>
-public class PlayTrackCommand : Command { public string Query { get; set; } = string.Empty; }
+public class PlayTrackCommand : Command 
+{ 
+    public string Query { get; set; } = string.Empty; 
+    public SourceType SourceType { get; set; }
+}
 
 /// <summary>
 /// Stop the currently playing track.
@@ -38,3 +42,7 @@ public class ResumeTrackCommand : Command { }
 /// Shuffle the tracks in the current playlist.
 /// </summary>
 public class ShuffleTracksCommand : Command { public bool Enabled { get; set; } }
+
+public class MoveToTopOfQueueCommand : Command { public string TrackIdentifier { get; set; } = string.Empty; }
+
+public class AddRecommendationCommand : PlayTrackCommand { public string BtnId { get; set; } = string.Empty; }

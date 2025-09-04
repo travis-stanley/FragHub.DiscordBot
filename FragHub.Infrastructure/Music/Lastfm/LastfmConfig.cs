@@ -5,10 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FragHub.Infrastructure.Config
+namespace FragHub.Infrastructure.Music.Lastfm
 {
-    public class InfrastructureConfig : IEnvConfig
+    public class LastfmConfig : IEnvConfig
     {
-        public const string SqlConnectionString = "SQL_CONNECTION_STRING";
+        public const string ApiToken = "LASTFM_TOKEN";
     }
 }
