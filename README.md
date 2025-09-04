@@ -1,6 +1,6 @@
 # FragHub.DiscordBot
 
-![.NET](https://img.shields.io/badge/.NET-9.0-blue)  ![License](https://img.shields.io/badge/license-MIT-lightgrey)  ![Status](https://img.shields.io/badge/status-hobby%20project-orange)
+[![.NET Build & Test](https://github.com/travis-stanley/FragHub.DiscordBot/actions/workflows/dotnet.yml/badge.svg)](https://github.com/travis-stanley/FragHub.DiscordBot/actions/workflows/dotnet.yml)  ![.NET](https://img.shields.io/badge/.NET-9.0-blue)  ![License](https://img.shields.io/badge/license-MIT-lightgrey)  ![Status](https://img.shields.io/badge/status-hobby%20project-orange)
 
 A hobby project that brings together **game server management**, **music playback**, and **user stats tracking** into a single **Discord bot** — built with a focus on **Clean Architecture** and **minimal coupling** between systems.  
 
