@@ -18,6 +18,7 @@ namespace FragHub.Application.Users.Commands
         public ulong? TextChannelId { get; set; }
         public ulong? VoiceChannelId { get; set; }
 
+        // add common properties here that are shared across all user commands, if needed
         public string Description { get; set; } = string.Empty;
         public List<string> DebugDetails { get; set; } = [];
     }
