@@ -82,9 +82,16 @@ public static class ServiceCollectionExtensions
     /// cref="RequiredVariables"/> instance.</remarks>
     /// <param name="services">The <see cref="IServiceCollection"/> to which the service will be added.</param>
     /// <returns>The updated <see cref="IServiceCollection"/> instance.</returns>
-    public static IServiceCollection AddVariableService(this IServiceCollection services)
-        object[] vars = [new LavalinkConfig(), new DiscordConfig(), new InfrastructureConfig()];
-        services.AddSingleton<IVariableService>(sp => new VariableService(sp.GetRequiredService<ILogger<IVariableService>>(), vars));
+    public static IServiceCollection AddVariableService(this IServiceCollection services) {
+        var assembliesTypes = Assembly.Load("FragHub.Application").GetTypes().ToList();
+        assembliesTypes.AddRange(Assembly.Load("FragHub.DiscordAdapter").GetTypes());
+        assembliesTypes.AddRange(Assembly.Load("FragHub.Domain").GetTypes());
+        assembliesTypes.AddRange(Assembly.Load("FragHub.Infrastructure").GetTypes());
+
+        var envConfigTypes = assembliesTypes.Where(t => typeof(IEnvConfig).IsAssignableFrom(t) && !t.IsInterface && t.IsClass);
+        var envConfigs = envConfigTypes.Select(t => Activator.CreateInstance(t) as IEnvConfig).ToArray();
+
+        services.AddSingleton<IVariableService>(sp => new VariableService(sp.GetRequiredService<ILogger<IVariableService>>(), envConfigs));
 
         return services;
     }
@@ -153,18 +160,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddMusicServices(this IServiceCollection services)
     {
         services.AddSingleton<IMusicService, DiscordMusicService>();        
-
-        return services;
-    }
-
-    /// <summary>
-    /// Add user-related services to the specified <see cref="IServiceCollection"/>.
-    /// </summary>
-    /// <param name="services"></param>
-    /// <returns></returns>
-    public static IServiceCollection AddUserServices(this IServiceCollection services)
-    {
-        services.AddSingleton<IUserService, UserService>();
 
         return services;
     }
